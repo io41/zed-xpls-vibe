@@ -1,0 +1,17 @@
+name = "Crossplane YAML"
+grammar = "go_template"
+path_suffixes = [
+  "-composition.yaml",
+  "-composition.yml",
+  "-definition.yaml",
+  "-definition.yml",
+  "crossplane.yaml",
+  "crossplane.yml",
+]
+line_comments = ["# "]
+block_comment = ["{{/* ", " */}}"]
+brackets = [
+  { start = "{{", end = "}}", close = true, newline = false },
+  { start = "{{-", end = "-}}", close = true, newline = false },
+  { start = "(", end = ")", close = true, newline = false },
+]

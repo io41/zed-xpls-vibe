@@ -1,11 +1,16 @@
 id = "up-xpls"
 name = "Up xpls"
-version = "0.0.2"
+version = "0.0.4"
 schema_version = 1
 authors = ["Tim Kersten"]
 description = "Crossplane package diagnostics powered by up xpls"
 repository = "https://github.com/io41/zed-up-xpls-vibe"
+languages = ["languages/crossplane-yaml"]
+
+[grammars.go_template]
+repository = "https://github.com/ngalaiko/tree-sitter-go-template"
+rev = "aa71f63de226c5592dfbfc1f29949522d7c95fac"
 
 [language_servers.up-xpls]
 name = "Up xpls"
-languages = ["YAML"]
+languages = ["Crossplane YAML"]

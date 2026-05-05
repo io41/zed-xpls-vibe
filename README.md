@@ -1,6 +1,6 @@
 # Up xpls for Zed
 
-Adds Crossplane package diagnostics to Zed by starting the `up xpls serve --verbose` language server for YAML files in Crossplane package worktrees.
+Adds Crossplane package diagnostics and Composition template highlighting to Zed by starting the `up xpls serve --verbose` language server for Crossplane YAML files.
 
 ## Requirements
 
@@ -31,7 +31,37 @@ up xpls serve --help
 
 Open a worktree that has a root `crossplane.yaml` or `upbound.yaml`, then install this repository with `zed: install dev extension`.
 
-The extension keeps Zed's native YAML support enabled and adds `up xpls serve --verbose` as a Crossplane-specific language server.
+The extension keeps Zed's native YAML support enabled for ordinary YAML and adds a `Crossplane YAML` language for:
+
+- `*-composition.yaml`
+- `*-composition.yml`
+- `*-definition.yaml`
+- `*-definition.yml`
+- `crossplane.yaml`
+- `crossplane.yml`
+
+`up-xpls` runs for `Crossplane YAML` files in Crossplane package worktrees.
+
+## Syntax Highlighting
+
+`Crossplane YAML` uses Go-template highlighting for `{{ ... }}` actions and injects YAML highlighting into the surrounding template text. This is intended for `function-go-templating` inline templates in Crossplane Compositions.
+
+If Zed does not automatically select `Crossplane YAML` for your Crossplane files, add a file type mapping to your Zed settings:
+
+```jsonc
+{
+  "file_types": {
+    "Crossplane YAML": [
+      "**/*-composition.yaml",
+      "**/*-composition.yml",
+      "**/*-definition.yaml",
+      "**/*-definition.yml",
+      "**/crossplane.yaml",
+      "**/crossplane.yml"
+    ]
+  }
+}
+```
 
 ## Repository
 
