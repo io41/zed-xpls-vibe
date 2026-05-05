@@ -1,6 +1,6 @@
 # Up xpls for Zed
 
-Adds Crossplane package diagnostics to Zed by starting the `up xpls serve` language server for YAML files in Crossplane package worktrees.
+Adds Crossplane package diagnostics to Zed by starting the `up xpls serve --verbose` language server for YAML files in Crossplane package worktrees.
 
 ## Requirements
 
@@ -29,9 +29,9 @@ up xpls serve --help
 
 ## Usage
 
-Open a worktree that has a root `crossplane.yaml`, then install this repository with `zed: install dev extension`.
+Open a worktree that has a root `crossplane.yaml` or `upbound.yaml`, then install this repository with `zed: install dev extension`.
 
-The extension keeps Zed's native YAML support enabled and adds `up xpls serve` as a Crossplane-specific language server.
+The extension keeps Zed's native YAML support enabled and adds `up xpls serve --verbose` as a Crossplane-specific language server.
 
 ## Repository
 
@@ -42,6 +42,8 @@ https://github.com/io41/zed-up-xpls-vibe
 ## Troubleshooting
 
 If `up` cannot be found, start Zed from a shell where `up xpls serve --help` works.
+
+If the Zed log shows `starting language server process` for `up xpls serve --verbose`, the extension attached successfully. Diagnostics can still disappear if the `up` language server process exits. With `up v0.48.0`, function dependency validation can panic while checking `crossplane.yaml`; the stack trace includes `VersionValidator` or `TypeValidator` under `internal/xpkg/snapshot/meta.go`. That is an `up xpls` server failure rather than a Zed extension startup failure.
 
 For extension logs, run Zed with:
 

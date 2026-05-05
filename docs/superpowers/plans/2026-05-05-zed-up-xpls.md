@@ -2,11 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build an initial Zed extension that starts `up xpls serve` for Crossplane package YAML worktrees.
+**Goal:** Build an initial Zed extension that starts `up xpls serve --verbose` for Crossplane package YAML worktrees.
 
-**Architecture:** The extension is a small Rust/WASM Zed extension. It registers `up-xpls` as an additional language server for Zed's built-in `YAML` language, detects Crossplane package worktrees by root `crossplane.yaml`, resolves `up` from the worktree shell environment, and launches `up xpls serve`.
+**Architecture:** The extension is a small Rust/WASM Zed extension. It registers `up-xpls` as an additional language server for Zed's built-in `YAML` language, detects Crossplane package worktrees by root `crossplane.yaml` or Upbound project worktrees by root `upbound.yaml`, resolves `up` from the worktree shell environment, and launches `up xpls serve --verbose`.
 
 **Tech Stack:** Zed extension manifest, Rust 2021, `zed_extension_api` 0.7.0, WebAssembly target `wasm32-wasip2`, Upbound `up` CLI.
+
+**2026-05-05 Update:** Upbound's VS Code extension uses the same thin language-client model, gates activation on `crossplane.yaml` or `upbound.yaml`, and runs `up xpls serve --verbose`. Current `up v0.48.0` can panic during function dependency validation; treat a Zed log stack trace under `internal/xpkg/snapshot/meta.go` as an upstream `xpls` failure, not a Zed extension attachment failure.
 
 ---
 

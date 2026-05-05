@@ -22,6 +22,17 @@ fn is_crossplane_package_manifest(contents: &str) -> bool {
     is_crossplane_meta && is_package_kind
 }
 
+fn is_upbound_project_manifest(contents: &str) -> bool {
+    let Some(api_version) = top_level_scalar(contents, "apiVersion") else {
+        return false;
+    };
+    let Some(kind) = top_level_scalar(contents, "kind") else {
+        return false;
+    };
+
+    api_version.starts_with("meta.dev.upbound.io/") && kind == "Project"
+}
+
 fn top_level_scalar(contents: &str, key: &str) -> Option<String> {
     let prefix = format!("{key}:");
 
@@ -40,7 +51,11 @@ fn top_level_scalar(contents: &str, key: &str) -> Option<String> {
 }
 
 fn xpls_args() -> Vec<String> {
-    vec!["xpls".to_string(), "serve".to_string()]
+    vec![
+        "xpls".to_string(),
+        "serve".to_string(),
+        "--verbose".to_string(),
+    ]
 }
 
 fn missing_up_message() -> String {
@@ -59,17 +74,24 @@ impl zed::Extension for UpXplsExtension {
         worktree: &zed::Worktree,
     ) -> Result<zed::Command> {
         if language_server_id.as_ref() != LANGUAGE_SERVER_ID {
-            return Err(format!("Unsupported language server id `{language_server_id}`"));
+            return Err(format!(
+                "Unsupported language server id `{language_server_id}`"
+            ));
         }
 
-        let manifest = worktree.read_text_file("crossplane.yaml").map_err(|_| {
-            "No root crossplane.yaml found; up xpls is only started for Crossplane package worktrees."
-                .to_string()
-        })?;
+        let has_crossplane_manifest = match worktree.read_text_file("crossplane.yaml") {
+            Ok(manifest) => is_crossplane_package_manifest(&manifest),
+            Err(_) => false,
+        };
+        let has_upbound_project = match worktree.read_text_file("upbound.yaml") {
+            Ok(manifest) => is_upbound_project_manifest(&manifest),
+            Err(_) => false,
+        };
 
-        if !is_crossplane_package_manifest(&manifest) {
+        if !has_crossplane_manifest && !has_upbound_project {
             return Err(
-                "Root crossplane.yaml is not recognized as Crossplane package metadata.".to_string(),
+                "No recognized root crossplane.yaml or upbound.yaml found; up xpls is only started for Crossplane package worktrees."
+                    .to_string(),
             );
         }
 
@@ -126,6 +148,30 @@ metadata:
     }
 
     #[test]
+    fn detects_upbound_project_manifest() {
+        let manifest = r#"
+apiVersion: meta.dev.upbound.io/v2alpha1
+kind: Project
+metadata:
+  name: platform-example
+"#;
+
+        assert!(is_upbound_project_manifest(manifest));
+    }
+
+    #[test]
+    fn rejects_non_project_upbound_yaml() {
+        let manifest = r#"
+apiVersion: meta.dev.upbound.io/v2alpha1
+kind: Widget
+metadata:
+  name: platform-example
+"#;
+
+        assert!(!is_upbound_project_manifest(manifest));
+    }
+
+    #[test]
     fn ignores_nested_keys() {
         let manifest = r#"
 metadata:
@@ -138,7 +184,14 @@ metadata:
 
     #[test]
     fn starts_xpls_over_stdio_compatible_command() {
-        assert_eq!(xpls_args(), vec!["xpls".to_string(), "serve".to_string()]);
+        assert_eq!(
+            xpls_args(),
+            vec![
+                "xpls".to_string(),
+                "serve".to_string(),
+                "--verbose".to_string()
+            ]
+        );
     }
 
     #[test]
