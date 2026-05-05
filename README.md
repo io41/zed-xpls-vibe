@@ -51,15 +51,17 @@ zed --foreground
 
 or use `zed: open log`.
 
-If the WASM build reports that `wasm32-wasip1` is missing even after installing the target, make sure Cargo is using the same rustup toolchain that owns the target:
+If the WASM build reports that `wasm32-wasip2` is missing even after installing the target, make sure Cargo is using the same rustup toolchain that owns the target:
 
 ```bash
-RUSTC="$(rustup which --toolchain stable rustc)" rustup run stable cargo build --target wasm32-wasip1
+PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo build --target wasm32-wasip2
 ```
+
+On this machine, `/opt/homebrew/bin/cargo` is Homebrew Rust and cannot compile Zed dev extensions. Put `/opt/homebrew/opt/rustup/bin` before `/opt/homebrew/bin` when launching Zed.
 
 ## Development
 
 ```bash
 cargo test
-cargo build --target wasm32-wasip1
+cargo build --target wasm32-wasip2
 ```

@@ -103,7 +103,7 @@ Automated:
 - Unit-test the package-manifest detection helper with Crossplane, Upbound, and non-Crossplane YAML samples.
 - Unit-test the command argument builder so it always returns `["xpls", "serve"]`.
 - Run `cargo test`.
-- Run `cargo build --target wasm32-wasip1`.
+- Run `cargo build --target wasm32-wasip2`.
 
 Manual:
 
