@@ -33,12 +33,9 @@ Open a worktree that has a root `crossplane.yaml` or `upbound.yaml`, then instal
 
 The extension keeps Zed's native YAML support enabled for ordinary YAML and adds a `Crossplane YAML` language for:
 
-- `*-composition.yaml`
-- `*-composition.yml`
-- `*-definition.yaml`
-- `*-definition.yml`
 - `crossplane.yaml`
 - `crossplane.yml`
+- files mapped to `Crossplane YAML` with Zed `file_types`, such as `*-composition.yaml` and `*-definition.yaml`
 
 `up-xpls` runs for `Crossplane YAML` files in Crossplane package worktrees.
 
@@ -46,7 +43,9 @@ The extension keeps Zed's native YAML support enabled for ordinary YAML and adds
 
 `Crossplane YAML` uses Go-template highlighting for `{{ ... }}` actions and injects YAML highlighting into the surrounding template text. This is intended for `function-go-templating` inline templates in Crossplane Compositions.
 
-If Zed does not automatically select `Crossplane YAML` for your Crossplane files, add a file type mapping to your Zed settings:
+Zed extension `path_suffixes` can match exact filenames and dot-delimited suffixes, but not glob-style names like `*-composition.yaml`. Zed's language `first_line_pattern` also cannot override the built-in YAML `.yaml` suffix match, so broad `apiVersion: ...crossplane.io/...` content detection is not reliable for YAML files.
+
+Add a file type mapping to your Zed settings for Crossplane Composition and XRD naming conventions:
 
 ```jsonc
 {

@@ -39,13 +39,9 @@ In scope:
 
 - Rename the Zed grammar id from `go_template` to `gotmpl`.
 - Keep the visible language name `Crossplane YAML`.
-- Keep automatic file matching for:
-  - `*-composition.yaml`
-  - `*-composition.yml`
-  - `*-definition.yaml`
-  - `*-definition.yml`
-  - `crossplane.yaml`
-  - `crossplane.yml`
+- Keep automatic detection for:
+  - exact package metadata filenames `crossplane.yaml` and `crossplane.yml`
+- Use Zed user `file_types` globs for Crossplane Compositions and XRDs named `*-composition.yaml`, `*-composition.yml`, `*-definition.yaml`, or `*-definition.yml`.
 - Expand highlight queries for Go template, Sprig, and Crossplane `function-go-templating` helpers.
 - Keep `up-xpls` attached to `Crossplane YAML`.
 - Document stale `xpls` diagnostics as an upstream server behavior when `up xpls serve` exits before publishing a clearing diagnostic set.
@@ -73,7 +69,12 @@ rev = "aa71f63de226c5592dfbfc1f29949522d7c95fac"
 ```toml
 name = "Crossplane YAML"
 grammar = "gotmpl"
+path_suffixes = ["crossplane.yaml", "crossplane.yml"]
 ```
+
+Zed `path_suffixes` do not support glob-style suffixes like `*-composition.yaml`. Internally, a suffix such as `longer.rs` matches `foo.longer.rs` because Zed checks for `.longer.rs`, but `-composition.yaml` would be checked as `.-composition.yaml` and therefore will not match `xtopic-composition.yaml`.
+
+A broad `first_line_pattern` such as `apiVersion:.*\\.crossplane\\.io/` is not a reliable replacement. Zed only evaluates it when no path suffix has already matched, so the built-in YAML `.yaml` match prevents content detection from selecting `Crossplane YAML` for normal YAML files. The short-term implementation therefore documents and uses `file_types` globs for Composition and XRD filenames.
 
 `languages/crossplane-yaml/injections.scm` should inject YAML into `text` nodes:
 
@@ -82,6 +83,8 @@ grammar = "gotmpl"
     (#set! "language" "yaml")
     (#set! "combined"))
 ```
+
+Keep this as the safe baseline for nested YAML in Go templates. Injecting YAML into the parent template node or enabling `injection.include-children` would pull template actions into the YAML parse and can degrade `{{ ... }}` highlighting. A future experiment may test `yaml_no_injection_text` for list-marker-only gaps, but it should not replace the `text` injection without fixtures that cover malformed comments, trim markers, and list-heavy templates.
 
 `languages/crossplane-yaml/highlights.scm` should keep generic Go template highlighting and include Crossplane helpers as built-ins:
 
@@ -128,6 +131,8 @@ Manual Zed verification:
 - Confirm no grammar compile error appears.
 - Open `fixtures/crossplane-package/api/xsetup-composition.yaml`.
 - Confirm the language is `Crossplane YAML`.
+- Open a real package Composition such as `api/xtopic-composition.yaml`.
+- Confirm it is selected as `Crossplane YAML` through the Zed `file_types` mapping.
 - Confirm Go template expressions highlight inside the inline template.
 - Confirm `up-xpls` starts in a Crossplane package worktree.
 

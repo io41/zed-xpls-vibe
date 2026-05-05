@@ -1,13 +1,8 @@
 name = "Crossplane YAML"
 grammar = "gotmpl"
-path_suffixes = [
-  "-composition.yaml",
-  "-composition.yml",
-  "-definition.yaml",
-  "-definition.yml",
-  "crossplane.yaml",
-  "crossplane.yml",
-]
+# Zed path_suffixes match dot-delimited suffixes or exact filenames. User
+# file_types globs are required for names like xexample-composition.yaml.
+path_suffixes = ["crossplane.yaml", "crossplane.yml"]
 line_comments = ["# "]
 block_comment = ["{{/* ", " */}}"]
 brackets = [

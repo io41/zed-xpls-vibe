@@ -35,6 +35,7 @@ The future experience should provide:
 - Diagnostics for references to fields that are not present in the inferred schema.
 - Diagnostics that clear reliably after fixes.
 - Optional commands or runnables for `crossplane render`, `crossplane beta validate`, or equivalent `up` flows.
+- Content-based language classification for any YAML file with a top-level or early `apiVersion` containing `.crossplane.io/`, if Zed gains a detector hook that can outrank the built-in YAML suffix match.
 
 ## Candidate Architectures
 
@@ -103,6 +104,7 @@ Only build a standalone Crossplane Template LSP if the desired semantic features
 - Inspect `.up/json/models` structure produced by `up project build`.
 - Define a schema inference model from XRD plus Composition pipeline context.
 - Decide whether Zed extension packaging can reasonably ship or download an external proxy binary.
+- Track whether Zed adds extension-provided language detection beyond `path_suffixes` and `first_line_pattern`, such as full-file or first-N-lines content matchers.
 
 ## Non-Goals
 
@@ -119,4 +121,3 @@ This deferred spec can move to active status only when:
 - There is a minimized upstream `xpls` crash reproduction or an upstream fix.
 - The team chooses one of the candidate architectures explicitly.
 - A separate implementation plan is written and reviewed.
-
