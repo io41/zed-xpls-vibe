@@ -56,7 +56,7 @@ version = "0.0.1"
 schema_version = 1
 authors = ["Tim Kersten"]
 description = "Crossplane package diagnostics powered by up xpls"
-repository = "https://github.com/tim-kersten/zed-up-xpls"
+repository = "https://github.com/io41/zed-up-xpls-vibe"
 
 [language_servers.up-xpls]
 name = "Up xpls"

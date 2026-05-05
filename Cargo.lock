@@ -739,7 +739,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "zed-up-xpls"
+name = "zed-up-xpls-vibe"
 version = "0.0.1"
 dependencies = [
  "zed_extension_api",
