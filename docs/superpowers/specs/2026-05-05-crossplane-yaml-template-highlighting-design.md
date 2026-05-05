@@ -37,7 +37,7 @@ The existing `up-xpls` diagnostics should continue to run. This feature is about
 
 Add an opt-in Crossplane-specific language named `Crossplane YAML`.
 
-The language uses the root `go_template` grammar from `ngalaiko/tree-sitter-go-template` as the outer parser. Its `injections.scm` injects YAML into plain template text, following the same proven pattern used by the installed Helm extension:
+The language uses the root `gotmpl` grammar from `ngalaiko/tree-sitter-go-template` as the outer parser. Its `injections.scm` injects YAML into plain template text, following the same proven pattern used by the installed Helm extension:
 
 ```scheme
 ((text) @content
@@ -85,7 +85,7 @@ Update `extension.toml` to declare the language and grammar:
 ```toml
 languages = ["languages/crossplane-yaml"]
 
-[grammars.go_template]
+[grammars.gotmpl]
 repository = "https://github.com/ngalaiko/tree-sitter-go-template"
 rev = "aa71f63de226c5592dfbfc1f29949522d7c95fac"
 
@@ -94,7 +94,7 @@ name = "Up xpls"
 languages = ["Crossplane YAML"]
 ```
 
-Use the root `go_template` grammar instead of the `helm` dialect to avoid colliding with the community Helm extension, which also registers a `helm` grammar.
+Use the root `gotmpl` grammar instead of the `helm` dialect to avoid colliding with the community Helm extension, which also registers a `helm` grammar.
 
 ## Language Files
 
@@ -102,7 +102,7 @@ Create `languages/crossplane-yaml/config.toml`:
 
 ```toml
 name = "Crossplane YAML"
-grammar = "go_template"
+grammar = "gotmpl"
 path_suffixes = [
   "-composition.yaml",
   "-composition.yml",
@@ -185,7 +185,7 @@ Manual checks in Zed:
 ## Risks
 
 - Zed may not treat the listed compound suffixes as expected. If so, users need the documented `file_types` mapping.
-- The `go_template` parser may not perfectly understand all Sprig or Crossplane helper functions, but function identifiers can still be highlighted.
+- The `gotmpl` parser may not perfectly understand all Sprig or Crossplane helper functions, but function identifiers can still be highlighted.
 - Because the outer parser is Go template, malformed template delimiters may affect highlighting more than native YAML would.
 - The buffer language may show `Crossplane YAML`, which is expected for this approach.
 

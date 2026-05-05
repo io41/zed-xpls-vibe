@@ -1,5 +1,5 @@
 name = "Crossplane YAML"
-grammar = "go_template"
+grammar = "gotmpl"
 path_suffixes = [
   "-composition.yaml",
   "-composition.yml",

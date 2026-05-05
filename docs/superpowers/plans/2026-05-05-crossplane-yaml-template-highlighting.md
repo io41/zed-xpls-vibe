@@ -4,7 +4,7 @@
 
 **Goal:** Add Go-template syntax highlighting for Crossplane Composition YAML files without changing `up xpls` diagnostics.
 
-**Architecture:** Add a new Zed language named `Crossplane YAML` that uses the `go_template` Tree-sitter grammar as the outer parser and injects YAML into template text. Keep native `YAML` untouched for normal YAML files, and attach `up-xpls` only to `Crossplane YAML`.
+**Architecture:** Add a new Zed language named `Crossplane YAML` that uses the `gotmpl` Tree-sitter grammar as the outer parser and injects YAML into template text. Keep native `YAML` untouched for normal YAML files, and attach `up-xpls` only to `Crossplane YAML`.
 
 **Tech Stack:** Zed language extension files, Tree-sitter query files, `ngalaiko/tree-sitter-go-template` pinned at `aa71f63de226c5592dfbfc1f29949522d7c95fac`, Rust/WASM extension build for `wasm32-wasip2`.
 
@@ -12,7 +12,7 @@
 
 ## File Structure
 
-- Modify: `extension.toml` - register `Crossplane YAML`, the `go_template` grammar, and attach `up-xpls` to that language.
+- Modify: `extension.toml` - register `Crossplane YAML`, the `gotmpl` grammar, and attach `up-xpls` to that language.
 - Create: `languages/crossplane-yaml/config.toml` - language metadata and bracket/comment behavior.
 - Create: `languages/crossplane-yaml/highlights.scm` - Go-template highlights with Crossplane/Sprig helpers.
 - Create: `languages/crossplane-yaml/injections.scm` - inject YAML into template text.
@@ -56,14 +56,14 @@ Edit `extension.toml` to include these exact changes:
 ```toml
 id = "up-xpls"
 name = "Up xpls"
-version = "0.0.4"
+version = "0.0.5"
 schema_version = 1
 authors = ["Tim Kersten"]
 description = "Crossplane package diagnostics powered by up xpls"
 repository = "https://github.com/io41/zed-up-xpls-vibe"
 languages = ["languages/crossplane-yaml"]
 
-[grammars.go_template]
+[grammars.gotmpl]
 repository = "https://github.com/ngalaiko/tree-sitter-go-template"
 rev = "aa71f63de226c5592dfbfc1f29949522d7c95fac"
 
@@ -72,7 +72,7 @@ name = "Up xpls"
 languages = ["Crossplane YAML"]
 ```
 
-This intentionally uses the root `go_template` grammar, not the `helm` dialect, to avoid a grammar-name collision with the community Helm extension.
+This intentionally uses the root `gotmpl` grammar, not the `helm` dialect, to avoid a grammar-name collision with the community Helm extension.
 
 - [ ] **Step 2: Verify the manifest shape**
 
@@ -82,7 +82,7 @@ Run:
 sed -n '1,80p' extension.toml
 ```
 
-Expected: the file contains top-level `languages = ["languages/crossplane-yaml"]`, a `[grammars.go_template]` block, and `up-xpls` lists `Crossplane YAML`.
+Expected: the file contains top-level `languages = ["languages/crossplane-yaml"]`, a `[grammars.gotmpl]` block, and `up-xpls` lists `Crossplane YAML`.
 
 ## Task 2: Add Language Metadata and Queries
 
@@ -107,7 +107,7 @@ Create `languages/crossplane-yaml/config.toml`:
 
 ```toml
 name = "Crossplane YAML"
-grammar = "go_template"
+grammar = "gotmpl"
 path_suffixes = [
   "-composition.yaml",
   "-composition.yml",
@@ -428,4 +428,4 @@ Expected: a commit is created with author and committer `Tim Kersten <tim@io41.c
 
 - Spec coverage: The plan registers a Crossplane-specific language, adds Go-template highlights, injects YAML, keeps `up-xpls` diagnostics on Crossplane YAML, documents fallback file mapping, and verifies real and fixture files.
 - Completeness scan: All file paths and implementation details are defined.
-- Type consistency: The language name is consistently `Crossplane YAML`, the grammar is consistently `go_template`, and `up-xpls` attaches to `Crossplane YAML`.
+- Type consistency: The language name is consistently `Crossplane YAML`, the grammar is consistently `gotmpl`, and `up-xpls` attaches to `Crossplane YAML`.
