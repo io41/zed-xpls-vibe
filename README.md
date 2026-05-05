@@ -73,6 +73,10 @@ https://github.com/io41/zed-up-xpls-vibe
 
 If `up` cannot be found, start Zed from a shell where `up xpls serve --help` works.
 
+If diagnostics remain after fixing a file and running Zed's Refresh Diagnostics command, check whether `up-xpls` is still running. `up xpls` publishes diagnostics to Zed; stale diagnostics are only cleared when the language server publishes a newer empty diagnostic set for the same file.
+
+If `up xpls serve` exits or panics, Zed has nothing new to replace the old diagnostics with.
+
 If the Zed log shows `starting language server process` for `up xpls serve --verbose`, the extension attached successfully. Diagnostics can still disappear if the `up` language server process exits. With `up v0.48.0`, function dependency validation can panic while checking `crossplane.yaml`; the stack trace includes `VersionValidator` or `TypeValidator` under `internal/xpkg/snapshot/meta.go`. That is an `up xpls` server failure rather than a Zed extension startup failure.
 
 For extension logs, run Zed with:
