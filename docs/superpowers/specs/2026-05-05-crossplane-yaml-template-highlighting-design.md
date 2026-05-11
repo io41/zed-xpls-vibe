@@ -175,7 +175,7 @@ Correct semantic support for Crossplane templates remains deferred to the long-t
 
 - Short-term spec: `docs/superpowers/specs/2026-05-05-crossplane-yaml-short-term-design.md`
 - Long-term deferred spec: `docs/superpowers/specs/2026-05-05-crossplane-yaml-long-term-deferred-design.md`
-- Implementation plan: `docs/superpowers/plans/2026-05-05-crossplane-yaml-template-highlighting.md`
+- Implementation plan: `docs/superpowers/plans/2026-05-11-crossplane-mixed-template-highlighting.md`
 - Zed language extensions: https://zed.dev/docs/extensions/languages
 - Zed code injections: https://zed.dev/docs/extensions/languages#code-injections
 - Go template Tree-sitter grammar: https://github.com/ngalaiko/tree-sitter-go-template
