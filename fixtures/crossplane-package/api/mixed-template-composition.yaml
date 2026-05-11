@@ -1,0 +1,59 @@
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xmixed.example.org
+spec:
+  compositeTypeRef:
+    apiVersion: example.org/v1alpha1
+    kind: XMixed
+  mode: Pipeline
+  pipeline:
+    - step: render
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: | # go
+            {{- $xr := getCompositeResource . -}}
+            {{- $name := dig "metadata" "name" "example" $xr | default "example" -}}
+            {{- $extra := getExtraResourcesFromContext . "network" -}}
+            ---
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: {{ $name | quote }}
+              annotations:
+                {{ setResourceNameAnnotation "example-config" }}
+                example.org/region: {{ dig "spec" "region" "eastus" $xr | quote }}
+            data:
+              observed: {{ getComposedResource . "example-config" | toJson | quote }}
+              connection: {{ getComposedConnectionDetails . "example-config" | toJson | quote }}
+              ready: {{ getResourceCondition $xr "Ready" | toJson | quote }}
+              extra: {{ $extra | toYaml | nindent 16 }}
+            {{- if empty (dig "spec" "topics" list $xr) }}
+            ---
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: {{ printf "%s-empty" $name | quote }}
+            stringData:
+              reason: {{ "no topics configured" | quote }}
+            {{- else }}
+            ---
+            apiVersion: v1
+            kind: List
+            items:
+              {{- range $topic := dig "spec" "topics" list $xr }}
+              - apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: {{ printf "%s-%s" $name $topic.name | quote }}
+                data:
+                  topic: {{ $topic.name | quote }}
+                  labels: {{ include "topic.labels" $topic | fromYaml | toYaml | nindent 18 }}
+              {{- end }}
+            {{- end }}
