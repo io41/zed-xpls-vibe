@@ -202,8 +202,11 @@ Update `languages/crossplane-yaml/highlights.scm` to this exact content:
 
 ; YAML-looking punctuation emitted by the go-template grammar.
 ; Keep this highlight-only; do not inject it as YAML content by default.
+; Scope this to top-level template children so malformed actions under ERROR
+; do not look like YAML list markers.
 
-(yaml_no_injection_text) @punctuation.list_marker
+(template
+  (yaml_no_injection_text) @punctuation.list_marker)
 
 ; Delimiters
 

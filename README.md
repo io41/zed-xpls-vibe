@@ -41,7 +41,9 @@ The extension keeps Zed's native YAML support enabled for ordinary YAML and adds
 
 ## Syntax Highlighting
 
-`Crossplane YAML` uses Go-template highlighting for `{{ ... }}` actions and injects YAML highlighting into the surrounding template text. This is intended for `function-go-templating` inline templates in Crossplane Compositions.
+`Crossplane YAML` uses Go-template highlighting for `{{ ... }}` actions and injects YAML highlighting into surrounding template text. This is intended for Crossplane `function-go-templating` inline templates where the block scalar emits YAML.
+
+The mixed YAML/template case is best-effort. Template actions remain highlighted, and plain generated YAML text is injected into the YAML parser, but some YAML constructs can still look imperfect when a scalar, list item, or indentation level is split by `{{ ... }}` actions.
 
 Zed extension `path_suffixes` can match exact filenames and dot-delimited suffixes, but not glob-style names like `*-composition.yaml`. Zed's language `first_line_pattern` also cannot override the built-in YAML `.yaml` suffix match, so broad `apiVersion: ...crossplane.io/...` content detection is not reliable for YAML files.
 

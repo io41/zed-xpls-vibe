@@ -30,7 +30,7 @@ Implemented baseline:
 - The extension defines a `Crossplane YAML` language.
 - The language uses the root `gotmpl` grammar from `ngalaiko/tree-sitter-go-template`.
 - `up-xpls` attaches to `Crossplane YAML`, not native `YAML`.
-- The extension version is `0.0.6`.
+- The extension version is `0.0.7`.
 - `crossplane.yaml` and `crossplane.yml` are matched directly by `path_suffixes`.
 - Composition and XRD filenames such as `*-composition.yaml` and `*-definition.yaml` require a Zed user `file_types` mapping because Zed extension `path_suffixes` cannot express glob-style suffixes.
 - `languages/crossplane-yaml/injections.scm` injects YAML into `text` nodes with `combined` enabled.
@@ -105,10 +105,11 @@ Add a fixture that includes:
 - Crossplane helper functions
 - document separators
 
-Then update `languages/crossplane-yaml/highlights.scm` only. The first pass should expand the built-in helper list and add highlight-only handling for `yaml_no_injection_text`:
+Then update `languages/crossplane-yaml/highlights.scm` only. The first pass should expand the built-in helper list and add highlight-only handling for top-level `yaml_no_injection_text` nodes:
 
 ```scheme
-(yaml_no_injection_text) @punctuation.list_marker
+(template
+  (yaml_no_injection_text) @punctuation.list_marker)
 ```
 
 Do not broaden `languages/crossplane-yaml/injections.scm` until a fixture proves the benefit outweighs the risk. If an injection experiment is needed, it must be a separate change and must compare:
