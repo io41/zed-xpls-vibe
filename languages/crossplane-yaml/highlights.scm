@@ -24,7 +24,15 @@
 ; Builtin, Sprig, and Crossplane go-templating helpers
 
 ((identifier) @function.builtin
-  (#match? @function.builtin "^(and|call|html|index|slice|js|len|not|or|print|printf|println|urlquery|eq|ne|lt|le|gt|ge|default|dig|empty|fail|quote|setResourceNameAnnotation|toJson|toYaml|trim|indent|nindent|b64enc|b64dec)$"))
+  (#match? @function.builtin "^(and|call|html|index|slice|js|len|not|or|print|printf|println|urlquery|eq|ne|lt|le|gt|ge|default|dig|empty|fail|quote|randomChoice|toJson|toYaml|fromYaml|trim|indent|nindent|b64enc|b64dec|getResourceCondition|getComposedResource|getComposedConnectionDetails|getCompositeResource|getExtraResources|getExtraResourcesFromContext|setResourceNameAnnotation|include)$"))
+
+; YAML-looking punctuation emitted by the go-template grammar.
+; Keep this highlight-only; do not inject it as YAML content by default.
+; Scope this to top-level template children so malformed actions under ERROR
+; do not look like YAML list markers.
+
+(template
+  (yaml_no_injection_text) @punctuation.list_marker)
 
 ; Delimiters
 
