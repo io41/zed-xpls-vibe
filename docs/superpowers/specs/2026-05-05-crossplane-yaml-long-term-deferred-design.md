@@ -22,6 +22,8 @@ Crossplane Go templates are more than generic Go templates:
 
 Syntax highlighting cannot provide completions, hovers, schema-aware diagnostics, or navigation for those concepts.
 
+The active mixed-template highlighting spec intentionally remains a query-level improvement. It can make generated YAML plus `{{ ... }}` actions more readable, but it cannot fully parse the post-rendered YAML shape or reason about Crossplane function request data.
+
 ## Desired Future Experience
 
 The future experience should provide:
@@ -36,6 +38,7 @@ The future experience should provide:
 - Diagnostics that clear reliably after fixes.
 - Optional commands or runnables for `crossplane render`, `crossplane beta validate`, or equivalent `up` flows.
 - Content-based language classification for any YAML file with a top-level or early `apiVersion` containing `.crossplane.io/`, if Zed gains a detector hook that can outrank the built-in YAML suffix match.
+- A template-aware parser or LSP path that can reason about generated YAML structure without sacrificing syntax visibility for embedded Go-template actions.
 
 ## Candidate Architectures
 

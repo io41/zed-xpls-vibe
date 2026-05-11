@@ -21,6 +21,8 @@ Caused by:
 
 The root parser in `ngalaiko/tree-sitter-go-template` exports `tree_sitter_gotmpl`, so the Zed grammar id must be `gotmpl`, not `go_template`.
 
+The baseline implementation is complete as of extension `0.0.6`. The next short-term increment is tracked in `docs/superpowers/specs/2026-05-05-crossplane-yaml-template-highlighting-design.md` and focuses on fixture-driven improvements for mixed generated YAML plus Crossplane Go-template actions.
+
 ## Recommended Approach
 
 Use a Crossplane-specific Zed language named `Crossplane YAML` backed by the root `gotmpl` Tree-sitter grammar from `ngalaiko/tree-sitter-go-template`.

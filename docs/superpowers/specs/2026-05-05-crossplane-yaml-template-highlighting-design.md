@@ -1,43 +1,117 @@
-# Crossplane YAML Template Highlighting Design Spec
+# Crossplane Mixed YAML Template Highlighting Design Spec
 
-**Status:** Draft
-**Date:** 2026-05-05
+**Status:** Active next-phase spec
+**Date:** 2026-05-11
 **Workspace:** `<local-zed-up-xpls-repo>`
 
 ## Goal
 
-Add syntax highlighting for Go template expressions embedded in Crossplane Composition YAML, especially `function-go-templating` inline templates like:
+Improve syntax highlighting for Crossplane Composition YAML files that contain `function-go-templating` inline templates. The target case is a YAML file whose `inline.template` block emits more YAML while also containing Crossplane-aware Go template actions:
 
 ```yaml
-template: | # go
-  {{- $xr := .observed.composite.resource -}}
-  metadata:
-    name: {{ $xr.metadata.name }}
+inline:
+  template: | # go
+    {{- $xr := .observed.composite.resource -}}
+    ---
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: {{ $xr.metadata.name | quote }}
+      annotations:
+        {{ setResourceNameAnnotation "example-config" }}
 ```
 
-The existing `up-xpls` diagnostics should continue to run. This feature is about editor syntax highlighting only.
+This spec covers syntax highlighting only. Diagnostics continue to come from `up xpls serve --verbose`.
 
-## Previous Behavior
+## Current Baseline
 
-- The extension registers `up-xpls` against Zed's built-in `YAML` language.
-- Zed therefore keeps the buffer language as `YAML`.
-- `up xpls` diagnostics appear, including messages such as `package does not depend on function "function-go-templating"`.
-- Inline Go template code inside YAML block scalars is treated as YAML scalar text, so `{{ ... }}` actions are not highlighted.
+Implemented baseline:
 
-## Constraints
+- The extension defines a `Crossplane YAML` language.
+- The language uses the root `gotmpl` grammar from `ngalaiko/tree-sitter-go-template`.
+- `up-xpls` attaches to `Crossplane YAML`, not native `YAML`.
+- The extension version is `0.0.6`.
+- `crossplane.yaml` and `crossplane.yml` are matched directly by `path_suffixes`.
+- Composition and XRD filenames such as `*-composition.yaml` and `*-definition.yaml` require a Zed user `file_types` mapping because Zed extension `path_suffixes` cannot express glob-style suffixes.
+- `languages/crossplane-yaml/injections.scm` injects YAML into `text` nodes with `combined` enabled.
+- Go template actions such as `{{ ... }}` highlight, and surrounding plain template text is offered to the YAML parser.
 
-- Zed syntax highlighting is Tree-sitter based.
-- Zed language injections are defined by `injections.scm` in a language extension.
-- Zed extension docs describe adding languages through `languages/<name>/config.toml`, grammars through `[grammars.*]`, and embedded language regions through `injections.scm`.
-- A Zed extension can attach a language server to a Crossplane-specific language, so `up-xpls` does not need to run for every native YAML buffer.
-- There is no documented way for this extension to append an injection query to Zed's built-in `YAML` language without defining a language of its own.
-- Crossplane package and API-extension files commonly use names ending in `-composition.yaml`, `-definition.yaml`, or root `crossplane.yaml`.
+Known limitation:
 
-## Approach
+- The mixed generated-YAML plus template case is not fully correct because YAML chunks are interrupted by template actions. Tree-sitter injections normally exclude child nodes. Adding `injection.include-children` would feed `{{ ... }}` actions into the YAML parser and would degrade template highlighting.
 
-Add an opt-in Crossplane-specific language named `Crossplane YAML`.
+## Zed Matching Constraint
 
-The language uses the root `gotmpl` grammar from `ngalaiko/tree-sitter-go-template` as the outer parser. Its `injections.scm` injects YAML into plain template text, following the same proven pattern used by the installed Helm extension:
+A broad matcher such as `apiVersion:.*\.crossplane\.io/` is desirable, but it is not reliable in current Zed language configs for normal YAML files.
+
+The built-in `YAML` language wins by `.yaml` suffix before `first_line_pattern` can select `Crossplane YAML`. In addition, Crossplane files often begin with `---`, comments, or metadata before the meaningful `apiVersion` line. Therefore, short-term file selection stays with:
+
+- exact `path_suffixes` for `crossplane.yaml` and `crossplane.yml`
+- documented user `file_types` globs for `*-composition.yaml`, `*-composition.yml`, `*-definition.yaml`, and `*-definition.yml`
+
+Full content-based language detection is deferred until Zed exposes an extension hook that can outrank built-in YAML suffix matching.
+
+## Short-Term Scope
+
+In scope:
+
+- Add fixture coverage for mixed generated YAML plus Go template constructs.
+- Expand helper-function highlighting to cover Crossplane `function-go-templating` helpers already listed in the short-term spec.
+- Add safe highlight-only treatment for upstream grammar nodes that represent YAML-looking punctuation, especially `yaml_no_injection_text`.
+- Keep the existing YAML injection into `text` nodes as the baseline.
+- Document exactly which mixed-template cases are expected to improve and which remain parser limitations.
+- Verify with `tree-sitter parse`, `tree-sitter query`, `cargo test`, and the Zed dev extension.
+
+Out of scope:
+
+- Do not use the Helm dialect.
+- Do not attach `up-xpls` to native `YAML`.
+- Do not enable `injection.include-children`.
+- Do not inject YAML into the parent `template` node.
+- Do not build or ship a custom parser in this phase.
+- Do not add completions, hover, semantic tokens, or schema-aware validation in this phase.
+
+## Target Highlighting Behavior
+
+The short-term implementation should make these cases look better:
+
+- Go template delimiters, keywords, variables, selectors, functions, pipelines, strings, numbers, booleans, and comments remain highlighted.
+- Crossplane helpers such as `getCompositeResource`, `getExtraResources`, `getExtraResourcesFromContext`, `getComposedResource`, `getComposedConnectionDetails`, `getResourceCondition`, `setResourceNameAnnotation`, `include`, `toYaml`, and `fromYaml` highlight as built-ins.
+- Common Sprig and Go-template helpers such as `default`, `dig`, `empty`, `fail`, `quote`, `trim`, `indent`, `nindent`, `b64enc`, and `b64dec` continue to highlight as built-ins.
+- Plain generated YAML text still receives YAML highlighting through `text` injections.
+- YAML document markers, keys, comments, string values, and list markers should be as readable as the parser allows when split by template actions.
+
+The implementation is allowed to leave these imperfect:
+
+- YAML parser errors caused by a scalar value being entirely or partly replaced by `{{ ... }}`.
+- YAML indentation that depends on conditional or range blocks.
+- Multi-document generated YAML where template actions determine whether a document exists.
+- Semantic understanding of `.observed`, `.desired`, `.context`, `.extraResources`, or XRD-derived fields.
+
+## Implementation Approach
+
+Use fixture-driven query work rather than broad parser changes.
+
+Add a fixture that includes:
+
+- a normal Crossplane Composition header
+- `function-go-templating` inline template source
+- variable assignment from `.observed.composite.resource`
+- conditionals
+- ranges that emit YAML list items
+- templated scalar values
+- templated annotations
+- `toYaml | nindent`
+- Crossplane helper functions
+- document separators
+
+Then update `languages/crossplane-yaml/highlights.scm` only. The first pass should expand the built-in helper list and add highlight-only handling for `yaml_no_injection_text`:
+
+```scheme
+(yaml_no_injection_text) @punctuation.list_marker
+```
+
+Do not broaden `languages/crossplane-yaml/injections.scm` until a fixture proves the benefit outweighs the risk. If an injection experiment is needed, it must be a separate change and must compare:
 
 ```scheme
 ((text) @content
@@ -45,154 +119,63 @@ The language uses the root `gotmpl` grammar from `ngalaiko/tree-sitter-go-templa
   (#set! "combined"))
 ```
 
-This makes Go template actions the primary syntax and keeps non-template text highlighted as YAML. It mirrors how Helm template highlighting works, but avoids taking over all YAML files.
-
-## File Detection
-
-The automatic detection should be conservative:
-
-- `path_suffixes = ["-composition.yaml", "-composition.yml", "-definition.yaml", "-definition.yml", "crossplane.yaml", "crossplane.yml"]`
-
-This should pick up files like:
-
-- `xsetup-composition.yaml`
-- `xnamespace-composition.yaml`
-- `xtopic-composition.yaml`
-- `xsetup-definition.yaml`
-- `crossplane.yaml`
-
-It should not claim all `.yaml` files. If Zed's `path_suffixes` does not match compound suffixes as expected, the fallback is documented user configuration:
-
-```jsonc
-{
-  "file_types": {
-    "Crossplane YAML": [
-      "**/*-composition.yaml",
-      "**/*-composition.yml",
-      "**/*-definition.yaml",
-      "**/*-definition.yml",
-      "**/crossplane.yaml",
-      "**/crossplane.yml"
-    ]
-  }
-}
-```
-
-## Extension Manifest
-
-Update `extension.toml` to declare the language and grammar:
-
-```toml
-languages = ["languages/crossplane-yaml"]
-
-[grammars.gotmpl]
-repository = "https://github.com/ngalaiko/tree-sitter-go-template"
-rev = "aa71f63de226c5592dfbfc1f29949522d7c95fac"
-
-[language_servers.up-xpls]
-name = "Up xpls"
-languages = ["Crossplane YAML"]
-```
-
-Use the root `gotmpl` grammar instead of the `helm` dialect to avoid colliding with the community Helm extension, which also registers a `helm` grammar.
-
-## Language Files
-
-Create `languages/crossplane-yaml/config.toml`:
-
-```toml
-name = "Crossplane YAML"
-grammar = "gotmpl"
-path_suffixes = [
-  "-composition.yaml",
-  "-composition.yml",
-  "-definition.yaml",
-  "-definition.yml",
-  "crossplane.yaml",
-  "crossplane.yml",
-]
-line_comments = ["# "]
-block_comment = ["{{/* ", " */}}"]
-brackets = [
-  { start = "{{", end = "}}", close = true, newline = false },
-  { start = "{{-", end = "-}}", close = true, newline = false },
-  { start = "(", end = ")", close = true, newline = false },
-]
-```
-
-Create `languages/crossplane-yaml/highlights.scm` by adapting the upstream `tree-sitter-go-template` query and adding common Crossplane/Sprig functions used in compositions:
-
-- `default`
-- `dig`
-- `empty`
-- `fail`
-- `quote`
-- `setResourceNameAnnotation`
-- `toJson`
-- `toYaml`
-- `trim`
-- `indent`
-- `nindent`
-
-Create `languages/crossplane-yaml/injections.scm` to inject YAML into Go-template text:
+against:
 
 ```scheme
-((text) @content
+((yaml_no_injection_text) @content
   (#set! "language" "yaml")
   (#set! "combined"))
 ```
 
-## Diagnostics
-
-Attach `up-xpls` to `Crossplane YAML`, not native `YAML`.
-
-Expected behavior:
-
-- A normal YAML file continues to use native `YAML` and native YAML highlighting.
-- A `*-composition.yaml` file uses `Crossplane YAML`.
-- A `*-definition.yaml` file uses `Crossplane YAML`.
-- A root `crossplane.yaml` or `crossplane.yml` file uses `Crossplane YAML`.
-- `up xpls` diagnostics still run in `*-composition.yaml` files.
-- Native YAML files outside the Crossplane filename set do not start `up-xpls`.
-- The language label may show `Crossplane YAML`, not `YAML`, for files claimed by this new language.
-
-## Non-Goals
-
-- Do not implement a Crossplane parser.
-- Do not patch or fork `up xpls`.
-- Do not replace normal YAML highlighting for every `.yaml` file.
-- Do not add Go-template completions or language-server support.
-- Do not attempt semantic awareness of `function-go-templating`; this is syntax highlighting only.
+The default recommendation is to keep `yaml_no_injection_text` highlight-only because upstream describes it as a YAML parser workaround rather than normal template text.
 
 ## Verification
 
 Automated checks:
 
-- `cargo test`
-- `PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo build --target wasm32-wasip2`
-- Confirm the extension manifest references an existing language directory and pinned grammar revision.
+```bash
+cargo fmt --check
+cargo test
+PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo build --target wasm32-wasip2
+python3 -c 'import tomllib; tomllib.load(open("extension.toml", "rb")); tomllib.load(open("languages/crossplane-yaml/config.toml", "rb")); print("toml ok")'
+git diff --check
+```
 
-Manual checks in Zed:
+Tree-sitter checks:
 
-- Reinstall the dev extension.
-- Open `/path/to/external/crossplane-package/api/xsetup-composition.yaml`.
-- Confirm the language is `Crossplane YAML` if automatic suffix detection works.
-- Confirm `{{ ... }}` actions highlight as Go-template syntax.
-- Confirm YAML surrounding the actions still highlights as YAML.
-- Confirm `xpls` diagnostics still appear.
-- Open a non-composition, non-definition YAML file and confirm it remains native `YAML`.
+```bash
+tree-sitter parse --grammar-path grammars/gotmpl --quiet fixtures/crossplane-package/api/mixed-template-composition.yaml
+tree-sitter query --grammar-path grammars/gotmpl languages/crossplane-yaml/highlights.scm fixtures/crossplane-package/api/mixed-template-composition.yaml
+tree-sitter query --grammar-path grammars/gotmpl languages/crossplane-yaml/injections.scm fixtures/crossplane-package/api/mixed-template-composition.yaml
+```
+
+Manual Zed checks:
+
+- Rebuild or reinstall the dev extension.
+- Open `fixtures/crossplane-package/api/mixed-template-composition.yaml`.
+- Confirm the language is `Crossplane YAML`.
+- Confirm Go template actions still highlight clearly.
+- Confirm generated YAML around template actions highlights as YAML where possible.
+- Open a real package Composition such as `api/xtopic-composition.yaml`.
+- Confirm `up-xpls` still starts in a Crossplane package worktree.
+- Confirm ordinary YAML files remain native `YAML`.
 
 ## Risks
 
-- Zed may not treat the listed compound suffixes as expected. If so, users need the documented `file_types` mapping.
-- The `gotmpl` parser may not perfectly understand all Sprig or Crossplane helper functions, but function identifiers can still be highlighted.
-- Because the outer parser is Go template, malformed template delimiters may affect highlighting more than native YAML would.
-- The buffer language may show `Crossplane YAML`, which is expected for this approach.
+- Some YAML injection gaps may be impossible to fix with query changes alone because the generated YAML is not syntactically complete until after template execution.
+- Highlighting `yaml_no_injection_text` may improve list-marker readability but does not make the YAML parser understand template-driven structure.
+- Broadening YAML injections can make template highlighting worse if template actions are fed into the YAML parser.
+- Visual verification in Zed remains necessary because Tree-sitter query output proves captures, not final theme rendering.
+
+## Deferred Work
+
+Correct semantic support for Crossplane templates remains deferred to the long-term spec. That includes completions, hovers, schema-aware field validation, reliable template diagnostics, and a possible `up xpls` improvement, LSP proxy, or dedicated Crossplane template LSP.
 
 ## References
 
+- Short-term spec: `docs/superpowers/specs/2026-05-05-crossplane-yaml-short-term-design.md`
+- Long-term deferred spec: `docs/superpowers/specs/2026-05-05-crossplane-yaml-long-term-deferred-design.md`
+- Implementation plan: `docs/superpowers/plans/2026-05-05-crossplane-yaml-template-highlighting.md`
 - Zed language extensions: https://zed.dev/docs/extensions/languages
 - Zed code injections: https://zed.dev/docs/extensions/languages#code-injections
-- Zed Helm language docs: https://zed.dev/docs/languages/helm
 - Go template Tree-sitter grammar: https://github.com/ngalaiko/tree-sitter-go-template
-- Installed Helm extension pattern: `~/Library/Application Support/Zed/extensions/installed/helm/languages/helm/injections.scm`

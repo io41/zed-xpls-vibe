@@ -1,10 +1,10 @@
-# Crossplane YAML Template Highlighting Implementation Plan
+# Crossplane Mixed Template Highlighting Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add Go-template syntax highlighting for Crossplane Composition YAML files without changing `up xpls` diagnostics.
+**Goal:** Improve highlighting for Crossplane Composition YAML files that mix generated YAML with Crossplane `function-go-templating` actions.
 
-**Architecture:** Add a new Zed language named `Crossplane YAML` that uses the `gotmpl` Tree-sitter grammar as the outer parser and injects YAML into template text. Keep native `YAML` untouched for normal YAML files, and attach `up-xpls` only to `Crossplane YAML`.
+**Architecture:** Keep the existing `Crossplane YAML` language backed by the `gotmpl` Tree-sitter grammar. Improve behavior with fixture-driven query changes: expand helper-function captures, add safe highlight-only handling for `yaml_no_injection_text`, and preserve the current YAML injection into `text` nodes.
 
 **Tech Stack:** Zed language extension files, Tree-sitter query files, `ngalaiko/tree-sitter-go-template` pinned at `aa71f63de226c5592dfbfc1f29949522d7c95fac`, Rust/WASM extension build for `wasm32-wasip2`.
 
@@ -12,122 +12,139 @@
 
 ## File Structure
 
-- Modify: `extension.toml` - register `Crossplane YAML`, the `gotmpl` grammar, and attach `up-xpls` to that language.
-- Create: `languages/crossplane-yaml/config.toml` - language metadata and bracket/comment behavior.
-- Create: `languages/crossplane-yaml/highlights.scm` - Go-template highlights with Crossplane/Sprig helpers.
-- Create: `languages/crossplane-yaml/injections.scm` - inject YAML into template text.
-- Create: `fixtures/crossplane-package/api/xsetup-composition.yaml` - fixture that exercises inline `function-go-templating`.
-- Modify: `README.md` - document the new language and fallback `file_types` mapping.
+- Create: `fixtures/crossplane-package/api/mixed-template-composition.yaml` - fixture covering generated YAML mixed with Crossplane Go-template actions.
+- Modify: `languages/crossplane-yaml/highlights.scm` - expand built-in helper highlighting and add safe highlight-only punctuation capture.
+- Verify unchanged: `languages/crossplane-yaml/injections.scm` - keep YAML injection limited to `text` nodes unless a later fixture proves a safer change.
+- Modify: `README.md` - document current mixed-template highlighting expectations and limitations.
+- Modify: `docs/superpowers/specs/2026-05-05-crossplane-yaml-template-highlighting-design.md` - keep the design in sync with the implemented query behavior.
 
-## Task 0: Starting State
+## Task 0: Baseline Check
 
 **Files:**
-- No files changed directly.
+- No file changes.
 
-- [ ] **Step 1: Check the working tree**
+- [ ] **Step 1: Confirm the worktree is clean**
 
 Run:
 
 ```bash
-git status --short
+git status --short --branch
 ```
 
-Expected: only intentional uncommitted changes are present. If unrelated user changes exist, leave them alone.
+Expected: output shows `## main...origin/main` and no modified files.
 
-- [ ] **Step 2: Confirm current tests pass before changing behavior**
+- [ ] **Step 2: Confirm the baseline extension still builds**
 
 Run:
 
 ```bash
+cargo fmt --check
 cargo test
+PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo build --target wasm32-wasip2
 ```
 
-Expected: all existing unit tests pass.
+Expected: formatting passes, all unit tests pass, and the WASM build finishes without errors.
 
-## Task 1: Register the Crossplane YAML Language
+## Task 1: Add Mixed Template Fixture
 
 **Files:**
-- Modify: `extension.toml`
+- Create: `fixtures/crossplane-package/api/mixed-template-composition.yaml`
 
-- [ ] **Step 1: Update the extension manifest**
+- [ ] **Step 1: Create the fixture**
 
-Edit `extension.toml` to include these exact changes:
+Create `fixtures/crossplane-package/api/mixed-template-composition.yaml` with this exact content:
 
-```toml
-id = "up-xpls"
-name = "Up xpls"
-version = "0.0.5"
-schema_version = 1
-authors = ["Tim Kersten"]
-description = "Crossplane package diagnostics powered by up xpls"
-repository = "https://github.com/io41/zed-up-xpls-vibe"
-languages = ["languages/crossplane-yaml"]
-
-[grammars.gotmpl]
-repository = "https://github.com/ngalaiko/tree-sitter-go-template"
-rev = "aa71f63de226c5592dfbfc1f29949522d7c95fac"
-
-[language_servers.up-xpls]
-name = "Up xpls"
-languages = ["Crossplane YAML"]
+```yaml
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xmixed.example.org
+spec:
+  compositeTypeRef:
+    apiVersion: example.org/v1alpha1
+    kind: XMixed
+  mode: Pipeline
+  pipeline:
+    - step: render
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: | # go
+            {{- $xr := getCompositeResource . -}}
+            {{- $name := dig "metadata" "name" "example" $xr | default "example" -}}
+            {{- $extra := getExtraResourcesFromContext . "network" -}}
+            ---
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: {{ $name | quote }}
+              annotations:
+                {{ setResourceNameAnnotation "example-config" }}
+                example.org/region: {{ dig "spec" "region" "eastus" $xr | quote }}
+            data:
+              observed: {{ getComposedResource . "example-config" | toJson | quote }}
+              connection: {{ getComposedConnectionDetails . "example-config" | toJson | quote }}
+              ready: {{ getResourceCondition $xr "Ready" | toJson | quote }}
+              extra: {{ $extra | toYaml | nindent 16 }}
+            {{- if empty (dig "spec" "topics" list $xr) }}
+            ---
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: {{ printf "%s-empty" $name | quote }}
+            stringData:
+              reason: {{ "no topics configured" | quote }}
+            {{- else }}
+            ---
+            apiVersion: v1
+            kind: List
+            items:
+              {{- range $topic := dig "spec" "topics" list $xr }}
+              - apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: {{ printf "%s-%s" $name $topic.name | quote }}
+                data:
+                  topic: {{ $topic.name | quote }}
+                  labels: {{ include "topic.labels" $topic | fromYaml | toYaml | nindent 18 }}
+              {{- end }}
+            {{- end }}
 ```
 
-This intentionally uses the root `gotmpl` grammar, not the `helm` dialect, to avoid a grammar-name collision with the community Helm extension.
-
-- [ ] **Step 2: Verify the manifest shape**
+- [ ] **Step 2: Parse the fixture with the gotmpl grammar**
 
 Run:
 
 ```bash
-sed -n '1,80p' extension.toml
+tree-sitter parse --grammar-path grammars/gotmpl --quiet fixtures/crossplane-package/api/mixed-template-composition.yaml
 ```
 
-Expected: the file contains top-level `languages = ["languages/crossplane-yaml"]`, a `[grammars.gotmpl]` block, and `up-xpls` lists `Crossplane YAML`.
+Expected: the command exits successfully. A warning about missing global parser directories is acceptable if the command still exits successfully.
 
-## Task 2: Add Language Metadata and Queries
-
-**Files:**
-- Create: `languages/crossplane-yaml/config.toml`
-- Create: `languages/crossplane-yaml/highlights.scm`
-- Create: `languages/crossplane-yaml/injections.scm`
-
-- [ ] **Step 1: Create the language directory**
+- [ ] **Step 3: Commit the fixture**
 
 Run:
 
 ```bash
-mkdir -p languages/crossplane-yaml
+git add fixtures/crossplane-package/api/mixed-template-composition.yaml
+GIT_AUTHOR_NAME="Tim Kersten" GIT_AUTHOR_EMAIL="tim@io41.com" GIT_COMMITTER_NAME="Tim Kersten" GIT_COMMITTER_EMAIL="tim@io41.com" git commit -m "test: add mixed crossplane template fixture"
 ```
 
-Expected: `languages/crossplane-yaml` exists.
+Expected: a commit is created with author and committer `Tim Kersten <tim@io41.com>`.
 
-- [ ] **Step 2: Add language metadata**
+## Task 2: Expand Query Coverage
 
-Create `languages/crossplane-yaml/config.toml`:
+**Files:**
+- Modify: `languages/crossplane-yaml/highlights.scm`
 
-```toml
-name = "Crossplane YAML"
-grammar = "gotmpl"
-path_suffixes = [
-  "-composition.yaml",
-  "-composition.yml",
-  "-definition.yaml",
-  "-definition.yml",
-  "crossplane.yaml",
-  "crossplane.yml",
-]
-line_comments = ["# "]
-block_comment = ["{{/* ", " */}}"]
-brackets = [
-  { start = "{{", end = "}}", close = true, newline = false },
-  { start = "{{-", end = "-}}", close = true, newline = false },
-  { start = "(", end = ")", close = true, newline = false },
-]
-```
+- [ ] **Step 1: Replace `languages/crossplane-yaml/highlights.scm`**
 
-- [ ] **Step 3: Add Go-template highlights**
-
-Create `languages/crossplane-yaml/highlights.scm`:
+Update `languages/crossplane-yaml/highlights.scm` to this content:
 
 ```scheme
 ; Identifiers
@@ -156,7 +173,12 @@ Create `languages/crossplane-yaml/highlights.scm`:
 ; Builtin, Sprig, and Crossplane go-templating helpers
 
 ((identifier) @function.builtin
-  (#match? @function.builtin "^(and|call|html|index|slice|js|len|not|or|print|printf|println|urlquery|eq|ne|lt|le|gt|ge|default|dig|empty|fail|quote|setResourceNameAnnotation|toJson|toYaml|trim|indent|nindent|b64enc|b64dec)$"))
+  (#match? @function.builtin "^(and|call|html|index|slice|js|len|not|or|print|printf|println|urlquery|eq|ne|lt|le|gt|ge|default|dig|empty|fail|quote|randomChoice|toJson|toYaml|fromYaml|trim|indent|nindent|b64enc|b64dec|getResourceCondition|getComposedResource|getComposedConnectionDetails|getCompositeResource|getExtraResources|getExtraResourcesFromContext|setResourceNameAnnotation|include)$"))
+
+; YAML-looking punctuation emitted by the go-template grammar.
+; Keep this highlight-only; do not inject it as YAML content by default.
+
+(yaml_no_injection_text) @punctuation.list_marker
 
 ; Delimiters
 
@@ -207,225 +229,130 @@ Create `languages/crossplane-yaml/highlights.scm`:
 (ERROR) @error
 ```
 
-- [ ] **Step 4: Inject YAML into template text**
-
-Create `languages/crossplane-yaml/injections.scm`:
-
-```scheme
-((text) @content
-  (#set! "language" "yaml")
-  (#set! "combined"))
-```
-
-This follows the same pattern used by the installed Helm extension, where the Go-template parser owns the file and YAML is injected into non-template text.
-
-## Task 3: Add a Fixture for Manual Highlighting Checks
-
-**Files:**
-- Create: `fixtures/crossplane-package/api/xsetup-composition.yaml`
-
-- [ ] **Step 1: Create the fixture directory**
+- [ ] **Step 2: Verify helper captures exist**
 
 Run:
 
 ```bash
-mkdir -p fixtures/crossplane-package/api
+tree-sitter query --grammar-path grammars/gotmpl languages/crossplane-yaml/highlights.scm fixtures/crossplane-package/api/mixed-template-composition.yaml
 ```
 
-Expected: `fixtures/crossplane-package/api` exists.
+Expected: output includes `function.builtin` captures for `getCompositeResource`, `getExtraResourcesFromContext`, `setResourceNameAnnotation`, `getComposedResource`, `getComposedConnectionDetails`, `getResourceCondition`, `toYaml`, `fromYaml`, and `include`.
 
-- [ ] **Step 2: Add a composition fixture**
+- [ ] **Step 3: Verify YAML injection query still runs**
 
-Create `fixtures/crossplane-package/api/xsetup-composition.yaml`:
+Run:
 
-```yaml
----
-apiVersion: apiextensions.crossplane.io/v1
-kind: Composition
-metadata:
-  name: xsetup.example.org
-spec:
-  compositeTypeRef:
-    apiVersion: example.org/v1alpha1
-    kind: XSetup
-  mode: Pipeline
-  pipeline:
-    - step: render
-      functionRef:
-        name: function-go-templating
-      input:
-        apiVersion: gotemplating.fn.crossplane.io/v1beta1
-        kind: GoTemplate
-        source: Inline
-        inline:
-          template: | # go
-            {{- $xr := .observed.composite.resource -}}
-            {{- $name := $xr.metadata.name | default "example" -}}
-            {{- if empty $xr.spec.region -}}
-              {{- fail "spec.region is required" -}}
-            {{- end -}}
-            ---
-            apiVersion: v1
-            kind: ConfigMap
-            metadata:
-              name: {{ $name | quote }}
-              annotations:
-                {{ setResourceNameAnnotation "example-config" }}
-            data:
-              region: {{ $xr.spec.region | quote }}
+```bash
+tree-sitter query --grammar-path grammars/gotmpl languages/crossplane-yaml/injections.scm fixtures/crossplane-package/api/mixed-template-composition.yaml
 ```
 
-## Task 4: Document Usage and Fallback Mapping
+Expected: output includes `content` captures for `text` nodes. Do not add `injection.include-children`.
+
+- [ ] **Step 4: Commit query updates**
+
+Run:
+
+```bash
+git add languages/crossplane-yaml/highlights.scm
+GIT_AUTHOR_NAME="Tim Kersten" GIT_AUTHOR_EMAIL="tim@io41.com" GIT_COMMITTER_NAME="Tim Kersten" GIT_COMMITTER_EMAIL="tim@io41.com" git commit -m "feat: expand crossplane template highlights"
+```
+
+Expected: a commit is created with author and committer `Tim Kersten <tim@io41.com>`.
+
+## Task 3: Document Mixed Highlighting Behavior
 
 **Files:**
 - Modify: `README.md`
+- Modify: `docs/superpowers/specs/2026-05-05-crossplane-yaml-template-highlighting-design.md`
 
-- [ ] **Step 1: Add a syntax highlighting section**
+- [ ] **Step 1: Update README syntax highlighting section**
 
-Add this section after the current Usage section in `README.md`:
-
-````markdown
-## Syntax Highlighting
-
-The extension includes a `Crossplane YAML` language for `*-composition.yaml`, `*-composition.yml`, `*-definition.yaml`, `*-definition.yml`, `crossplane.yaml`, and `crossplane.yml` files. It uses Go-template highlighting for `{{ ... }}` actions and injects YAML highlighting into the surrounding template text.
-
-`up-xpls` diagnostics are attached to `Crossplane YAML`. Native `YAML` files remain handled by Zed's normal YAML support.
-
-If Zed does not automatically select `Crossplane YAML` for your Crossplane files, add a file type mapping to your Zed settings:
-
-```jsonc
-{
-  "file_types": {
-    "Crossplane YAML": [
-      "**/*-composition.yaml",
-      "**/*-composition.yml",
-      "**/*-definition.yaml",
-      "**/*-definition.yml",
-      "**/crossplane.yaml",
-      "**/crossplane.yml"
-    ]
-  }
-}
-```
-````
-
-- [ ] **Step 2: Update the opening description**
-
-Change the first paragraph in `README.md` from diagnostics-only wording to:
+In `README.md`, replace the `Syntax Highlighting` paragraph with:
 
 ```markdown
-Adds Crossplane package diagnostics and Composition template highlighting to Zed by starting the `up xpls serve --verbose` language server for `Crossplane YAML` files.
+`Crossplane YAML` uses Go-template highlighting for `{{ ... }}` actions and injects YAML highlighting into surrounding template text. This is intended for Crossplane `function-go-templating` inline templates where the block scalar emits YAML.
+
+The mixed YAML/template case is best-effort. Template actions remain highlighted, and plain generated YAML text is injected into the YAML parser, but some YAML constructs can still look imperfect when a scalar, list item, or indentation level is split by `{{ ... }}` actions.
 ```
 
-## Task 5: Verify Build and Editor Behavior
+Keep the existing `file_types` mapping section below it.
+
+- [ ] **Step 2: Verify the spec is current**
+
+Run:
+
+```bash
+sed -n '1,220p' docs/superpowers/specs/2026-05-05-crossplane-yaml-template-highlighting-design.md
+```
+
+Expected: the spec describes the current baseline, the Zed matching constraint, the short-term mixed-template scope, and deferred semantic/LSP work.
+
+- [ ] **Step 3: Commit documentation updates**
+
+Run:
+
+```bash
+git add README.md docs/superpowers/specs/2026-05-05-crossplane-yaml-template-highlighting-design.md
+GIT_AUTHOR_NAME="Tim Kersten" GIT_AUTHOR_EMAIL="tim@io41.com" GIT_COMMITTER_NAME="Tim Kersten" GIT_COMMITTER_EMAIL="tim@io41.com" git commit -m "docs: describe mixed template highlighting"
+```
+
+Expected: a commit is created with author and committer `Tim Kersten <tim@io41.com>`.
+
+## Task 4: Final Verification
 
 **Files:**
-- No files changed directly.
+- No file changes expected unless verification reveals a problem.
 
-- [ ] **Step 1: Run formatting check**
+- [ ] **Step 1: Run full automated checks**
 
 Run:
 
 ```bash
 cargo fmt --check
-```
-
-Expected: no output and exit code 0.
-
-- [ ] **Step 2: Run unit tests**
-
-Run:
-
-```bash
 cargo test
-```
-
-Expected: all tests pass.
-
-- [ ] **Step 3: Build the Zed WASM extension**
-
-Run:
-
-```bash
 PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo build --target wasm32-wasip2
-```
-
-Expected: build succeeds.
-
-- [ ] **Step 4: Reinstall the dev extension**
-
-In Zed, run `zed: install dev extension` and select `<local-zed-up-xpls-repo>`.
-
-Expected: the extension installs without a Rust compile error.
-
-- [ ] **Step 5: Check the local fixture**
-
-Open:
-
-```text
-<local-zed-up-xpls-repo>/fixtures/crossplane-package/api/xsetup-composition.yaml
-```
-
-Expected:
-
-- The language selector shows `Crossplane YAML` if compound suffix detection works.
-- `{{ ... }}` actions have Go-template highlighting.
-- YAML text inside the template still has YAML highlighting.
-- `up-xpls` starts for the worktree because `fixtures/crossplane-package/crossplane.yaml` exists.
-
-- [ ] **Step 6: Check the user's real composition**
-
-Open:
-
-```text
-/path/to/external/crossplane-package/api/xsetup-composition.yaml
-```
-
-Expected:
-
-- The language selector shows `Crossplane YAML`.
-- The `template: | # go` blocks highlight Go-template actions.
-- Existing `xpls` diagnostics still appear.
-
-- [ ] **Step 7: Check normal YAML is untouched**
-
-Open:
-
-```text
-<local-zed-up-xpls-repo>/fixtures/not-crossplane/config.yaml
-```
-
-Expected: the language selector remains native `YAML`, not `Crossplane YAML`, and `up-xpls` is not started for this file.
-
-## Task 6: Commit
-
-**Files:**
-- All files modified in this plan.
-
-- [ ] **Step 1: Review the final diff**
-
-Run:
-
-```bash
-git diff --stat
+python3 -c 'import tomllib; tomllib.load(open("extension.toml", "rb")); tomllib.load(open("languages/crossplane-yaml/config.toml", "rb")); print("toml ok")'
 git diff --check
 ```
 
-Expected: changed files match this plan, and `git diff --check` has no output.
+Expected: every command exits successfully.
 
-- [ ] **Step 2: Commit with the required author**
+- [ ] **Step 2: Rebuild the dev extension in Zed**
+
+In Zed:
+
+```text
+zed: extensions
+```
+
+Open the dev extension card for `Up xpls` and click `Rebuild`.
+
+Expected: Zed recompiles the extension without a grammar compile error.
+
+- [ ] **Step 3: Manually inspect fixture highlighting**
+
+Open:
+
+```text
+fixtures/crossplane-package/api/mixed-template-composition.yaml
+```
+
+Expected:
+
+- language label is `Crossplane YAML`
+- Go-template delimiters and keywords are visible
+- Crossplane helpers are styled as functions or built-ins
+- generated YAML around template actions is still readable
+- ordinary YAML files continue to open as native `YAML`
+
+- [ ] **Step 4: Push commits**
 
 Run:
 
 ```bash
-git add extension.toml languages/crossplane-yaml README.md fixtures/crossplane-package/api/xsetup-composition.yaml docs/superpowers/specs/2026-05-05-crossplane-yaml-template-highlighting-design.md docs/superpowers/plans/2026-05-05-crossplane-yaml-template-highlighting.md
-GIT_AUTHOR_NAME='Tim Kersten' GIT_AUTHOR_EMAIL='tim@io41.com' GIT_COMMITTER_NAME='Tim Kersten' GIT_COMMITTER_EMAIL='tim@io41.com' git commit -m 'feat: add crossplane template highlighting'
+git status --short --branch
+git push
 ```
 
-Expected: a commit is created with author and committer `Tim Kersten <tim@io41.com>`.
-
-## Plan Self-Review
-
-- Spec coverage: The plan registers a Crossplane-specific language, adds Go-template highlights, injects YAML, keeps `up-xpls` diagnostics on Crossplane YAML, documents fallback file mapping, and verifies real and fixture files.
-- Completeness scan: All file paths and implementation details are defined.
-- Type consistency: The language name is consistently `Crossplane YAML`, the grammar is consistently `gotmpl`, and `up-xpls` attaches to `Crossplane YAML`.
+Expected: the branch is clean and pushed to `origin/main`.
