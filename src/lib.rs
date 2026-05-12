@@ -58,6 +58,16 @@ fn xpls_args() -> Vec<String> {
     ]
 }
 
+fn normalize_vibe_xpls_bin(value: &str) -> Option<String> {
+    Some(value.trim().to_string()).filter(|value| !value.is_empty())
+}
+
+fn env_value(env: &[(String, String)], key: &str) -> Option<String> {
+    env.iter()
+        .find_map(|(name, value)| (name == key).then(|| value.as_str()))
+        .and_then(normalize_vibe_xpls_bin)
+}
+
 fn missing_up_message() -> String {
     "Could not find the `up` CLI on PATH. Install it with `brew install upbound/tap/up` or `curl -sL https://cli.upbound.io | sh`, then restart Zed from a shell that can run `up xpls serve`."
         .to_string()
@@ -95,12 +105,20 @@ impl zed::Extension for UpXplsExtension {
             );
         }
 
-        let command = worktree.which("up").ok_or_else(missing_up_message)?;
+        let env = worktree.shell_env();
+
+        if let Some(command) = env_value(&env, "VIBE_XPLS_BIN") {
+            return Ok(zed::Command {
+                command,
+                args: Vec::new(),
+                env,
+            });
+        }
 
         Ok(zed::Command {
-            command,
+            command: worktree.which("up").ok_or_else(missing_up_message)?,
             args: xpls_args(),
-            env: worktree.shell_env(),
+            env,
         })
     }
 }
@@ -191,6 +209,32 @@ metadata:
                 "serve".to_string(),
                 "--verbose".to_string()
             ]
+        );
+    }
+
+    #[test]
+    fn ignores_empty_vibe_xpls_override() {
+        assert_eq!(normalize_vibe_xpls_bin(" "), None);
+    }
+
+    #[test]
+    fn trims_vibe_xpls_override() {
+        assert_eq!(
+            normalize_vibe_xpls_bin(" /tmp/vibe-xpls "),
+            Some("/tmp/vibe-xpls".to_string())
+        );
+    }
+
+    #[test]
+    fn reads_vibe_xpls_override_from_shell_env() {
+        let env = vec![
+            ("PATH".to_string(), "/usr/bin".to_string()),
+            ("VIBE_XPLS_BIN".to_string(), " /tmp/vibe-xpls ".to_string()),
+        ];
+
+        assert_eq!(
+            env_value(&env, "VIBE_XPLS_BIN"),
+            Some("/tmp/vibe-xpls".to_string())
         );
     }
 
