@@ -36,7 +36,7 @@ The extension keeps Zed's native YAML support enabled for ordinary YAML and adds
 
 - `crossplane.yaml`
 - `crossplane.yml`
-- files mapped to `Crossplane YAML` with Zed `file_types`, such as `*-composition.yaml` and `*-definition.yaml`
+- files mapped to `Crossplane YAML` with Zed `file_types`, such as `*-composition.yaml`, `composition.yaml`, and `*-definition.yaml`
 
 `zed-xpls-vibe` runs for `Crossplane YAML` files in Crossplane package worktrees.
 
@@ -56,6 +56,8 @@ Add a file type mapping to your Zed settings for Crossplane Composition and XRD 
     "Crossplane YAML": [
       "**/*-composition.yaml",
       "**/*-composition.yml",
+      "**/composition.yaml",
+      "**/composition.yml",
       "**/*-definition.yaml",
       "**/*-definition.yml",
       "**/crossplane.yaml",
