@@ -1,16 +1,16 @@
-id = "up-xpls"
-name = "Up xpls"
-version = "0.0.7"
+id = "zed-xpls-vibe"
+name = "Zed xpls Vibe"
+version = "0.0.1"
 schema_version = 1
 authors = ["Tim Kersten"]
-description = "Crossplane package diagnostics powered by up xpls"
-repository = "https://github.com/io41/zed-up-xpls-vibe"
+description = "Crossplane package diagnostics powered by the local vibe-xpls milestone binary"
+repository = "https://github.com/io41/zed-xpls-vibe"
 languages = ["languages/crossplane-yaml"]
 
 [grammars.gotmpl]
 repository = "https://github.com/ngalaiko/tree-sitter-go-template"
 rev = "aa71f63de226c5592dfbfc1f29949522d7c95fac"
 
-[language_servers.up-xpls]
-name = "Up xpls"
+[language_servers.zed-xpls-vibe]
+name = "Zed xpls Vibe"
 languages = ["Crossplane YAML"]

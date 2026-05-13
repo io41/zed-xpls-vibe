@@ -1,30 +1,31 @@
-# Up xpls for Zed
+# Zed xpls Vibe
 
-Adds Crossplane package diagnostics and Composition template highlighting to Zed by starting the `up xpls serve --verbose` language server for Crossplane YAML files.
+Local Zed dev extension for validating the first runnable `vibe-xpls` milestone.
+
+This fork intentionally avoids the original `up-xpls` extension id, the `up` CLI fallback, and the `VIBE_XPLS_BIN` environment override. It starts the local milestone language server directly:
+
+```text
+<temporary-vibe-xpls-binary> serve
+```
 
 ## Requirements
 
 - Zed
 - Rust installed with `rustup` for local development
-- Upbound `up` CLI available on `PATH`
+- A `vibe-xpls` binary built at `<temporary-vibe-xpls-binary>`
 
-Install `up`:
+Build the binary from the milestone worktree:
 
 ```bash
-brew install upbound/tap/up
+cd <local-vibe-xpls-worktree>
+go build -o <temporary-vibe-xpls-binary> ./cmd/vibe-xpls
+<temporary-vibe-xpls-binary> --version
 ```
 
-or:
+Expected version output:
 
-```bash
-curl -sL https://cli.upbound.io | sh
-```
-
-Verify:
-
-```bash
-up version
-up xpls serve --help
+```text
+vibe-xpls v0.0.1
 ```
 
 ## Usage
@@ -37,7 +38,7 @@ The extension keeps Zed's native YAML support enabled for ordinary YAML and adds
 - `crossplane.yml`
 - files mapped to `Crossplane YAML` with Zed `file_types`, such as `*-composition.yaml` and `*-definition.yaml`
 
-`up-xpls` runs for `Crossplane YAML` files in Crossplane package worktrees.
+`zed-xpls-vibe` runs for `Crossplane YAML` files in Crossplane package worktrees.
 
 ## Syntax Highlighting
 
@@ -67,18 +68,16 @@ Add a file type mapping to your Zed settings for Crossplane Composition and XRD 
 ## Repository
 
 ```text
-https://github.com/io41/zed-up-xpls-vibe
+https://github.com/io41/zed-xpls-vibe
 ```
 
 ## Troubleshooting
 
-If `up` cannot be found, start Zed from a shell where `up xpls serve --help` works.
+If Zed does not start this server, first confirm that the original `up-xpls` extension is uninstalled or disabled, then install this repository as a dev extension.
 
-If diagnostics remain after fixing a file and running Zed's Refresh Diagnostics command, check whether `up-xpls` is still running. `up xpls` publishes diagnostics to Zed; stale diagnostics are only cleared when the language server publishes a newer empty diagnostic set for the same file.
+If Zed logs show that the worktree is not trusted, trust the fixture/package worktree in Zed and reopen it. Zed will not start language servers for untrusted worktrees.
 
-If `up xpls serve` exits or panics, Zed has nothing new to replace the old diagnostics with.
-
-If the Zed log shows `starting language server process` for `up xpls serve --verbose`, the extension attached successfully. Diagnostics can still disappear if the `up` language server process exits. With `up v0.48.0`, function dependency validation can panic while checking `crossplane.yaml`; the stack trace includes `VersionValidator` or `TypeValidator` under `internal/xpkg/snapshot/meta.go`. That is an `up xpls` server failure rather than a Zed extension startup failure.
+If Zed logs show `<temporary-vibe-xpls-binary>` starting but diagnostics, hover, or completion are absent, check `<temporary-vibe-xpls-binary> --version` and run the protocol smoke tests from the `vibe-xpls` milestone worktree.
 
 For extension logs, run Zed with:
 

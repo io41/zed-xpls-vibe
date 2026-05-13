@@ -1,8 +1,9 @@
 use zed_extension_api::{self as zed, Result};
 
-const LANGUAGE_SERVER_ID: &str = "up-xpls";
+const LANGUAGE_SERVER_ID: &str = "zed-xpls-vibe";
+const MILESTONE_XPLS_BIN: &str = "<temporary-vibe-xpls-binary>";
 
-struct UpXplsExtension;
+struct ZedXplsVibeExtension;
 
 fn is_crossplane_package_manifest(contents: &str) -> bool {
     let Some(api_version) = top_level_scalar(contents, "apiVersion") else {
@@ -50,30 +51,11 @@ fn top_level_scalar(contents: &str, key: &str) -> Option<String> {
     })
 }
 
-fn xpls_args() -> Vec<String> {
-    vec![
-        "xpls".to_string(),
-        "serve".to_string(),
-        "--verbose".to_string(),
-    ]
+fn vibe_xpls_args() -> Vec<String> {
+    vec!["serve".to_string()]
 }
 
-fn normalize_vibe_xpls_bin(value: &str) -> Option<String> {
-    Some(value.trim().to_string()).filter(|value| !value.is_empty())
-}
-
-fn env_value(env: &[(String, String)], key: &str) -> Option<String> {
-    env.iter()
-        .find_map(|(name, value)| (name == key).then(|| value.as_str()))
-        .and_then(normalize_vibe_xpls_bin)
-}
-
-fn missing_up_message() -> String {
-    "Could not find the `up` CLI on PATH. Install it with `brew install upbound/tap/up` or `curl -sL https://cli.upbound.io | sh`, then restart Zed from a shell that can run `up xpls serve`."
-        .to_string()
-}
-
-impl zed::Extension for UpXplsExtension {
+impl zed::Extension for ZedXplsVibeExtension {
     fn new() -> Self {
         Self
     }
@@ -100,30 +82,20 @@ impl zed::Extension for UpXplsExtension {
 
         if !has_crossplane_manifest && !has_upbound_project {
             return Err(
-                "No recognized root crossplane.yaml or upbound.yaml found; up xpls is only started for Crossplane package worktrees."
+                "No recognized root crossplane.yaml or upbound.yaml found; zed-xpls-vibe is only started for Crossplane package worktrees."
                     .to_string(),
             );
         }
 
-        let env = worktree.shell_env();
-
-        if let Some(command) = env_value(&env, "VIBE_XPLS_BIN") {
-            return Ok(zed::Command {
-                command,
-                args: Vec::new(),
-                env,
-            });
-        }
-
         Ok(zed::Command {
-            command: worktree.which("up").ok_or_else(missing_up_message)?,
-            args: xpls_args(),
-            env,
+            command: MILESTONE_XPLS_BIN.to_string(),
+            args: vibe_xpls_args(),
+            env: worktree.shell_env(),
         })
     }
 }
 
-zed::register_extension!(UpXplsExtension);
+zed::register_extension!(ZedXplsVibeExtension);
 
 #[cfg(test)]
 mod tests {
@@ -201,47 +173,17 @@ metadata:
     }
 
     #[test]
-    fn starts_xpls_over_stdio_compatible_command() {
-        assert_eq!(
-            xpls_args(),
-            vec![
-                "xpls".to_string(),
-                "serve".to_string(),
-                "--verbose".to_string()
-            ]
-        );
+    fn uses_unique_language_server_id() {
+        assert_eq!(LANGUAGE_SERVER_ID, "zed-xpls-vibe");
     }
 
     #[test]
-    fn ignores_empty_vibe_xpls_override() {
-        assert_eq!(normalize_vibe_xpls_bin(" "), None);
+    fn uses_milestone_binary_path() {
+        assert_eq!(MILESTONE_XPLS_BIN, "<temporary-vibe-xpls-binary>");
     }
 
     #[test]
-    fn trims_vibe_xpls_override() {
-        assert_eq!(
-            normalize_vibe_xpls_bin(" /tmp/vibe-xpls "),
-            Some("/tmp/vibe-xpls".to_string())
-        );
-    }
-
-    #[test]
-    fn reads_vibe_xpls_override_from_shell_env() {
-        let env = vec![
-            ("PATH".to_string(), "/usr/bin".to_string()),
-            ("VIBE_XPLS_BIN".to_string(), " /tmp/vibe-xpls ".to_string()),
-        ];
-
-        assert_eq!(
-            env_value(&env, "VIBE_XPLS_BIN"),
-            Some("/tmp/vibe-xpls".to_string())
-        );
-    }
-
-    #[test]
-    fn missing_up_message_is_actionable() {
-        let message = missing_up_message();
-        assert!(message.contains("brew install upbound/tap/up"));
-        assert!(message.contains("https://cli.upbound.io"));
+    fn starts_vibe_xpls_serve() {
+        assert_eq!(vibe_xpls_args(), vec!["serve".to_string()]);
     }
 }

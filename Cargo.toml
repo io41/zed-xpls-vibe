@@ -1,5 +1,5 @@
 [package]
-name = "zed-up-xpls-vibe"
+name = "zed-xpls-vibe"
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
