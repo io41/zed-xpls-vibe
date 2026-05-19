@@ -17,7 +17,7 @@ Task 3 removed the temporary query block. `rg -n "SPIKE ONLY|@embedded|@text.lit
 
 Zed was validated with `zed-xpls-vibe` installed as a dev extension. `Crossplane YAML` was registered, files opened, and the LSP started with `<temporary-vibe-xpls-binary> serve`.
 
-The active Zed theme name is unknown.
+The active Zed theme was inferred as `Monokai Pro`: Zed settings use `mode: system` with `dark: "Monokai Pro"`, and macOS reported Dark mode during follow-up verification.
 
 Syntax highlighting still works, and generated `---` alignment is correct. The generated `---` token is sometimes red and sometimes green. There is no visible distinction between inner generated YAML and outer YAML, so the captured generated ranges did not provide a viable extension-owned contrast.
 
