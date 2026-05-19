@@ -8,8 +8,8 @@ repository = "https://github.com/io41/zed-xpls-vibe"
 languages = ["languages/crossplane-yaml"]
 
 [grammars.gotmpl]
-repository = "https://github.com/ngalaiko/tree-sitter-go-template"
-rev = "aa71f63de226c5592dfbfc1f29949522d7c95fac"
+repository = "https://github.com/io41/tree-sitter-go-template"
+rev = "19d1900dad709d8746cf978d1c561a2b5e075d2b"
 
 [language_servers.zed-xpls-vibe]
 name = "Zed xpls Vibe"

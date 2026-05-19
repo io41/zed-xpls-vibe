@@ -30,15 +30,23 @@ vibe-xpls v0.0.1
 
 ## Usage
 
-Open a worktree that has a root `crossplane.yaml` or `upbound.yaml`, then install this repository with `zed: install dev extension`.
+Install this repository with `zed: install dev extension`, then open a file classified as `Crossplane YAML`.
 
 The extension keeps Zed's native YAML support enabled for ordinary YAML and adds a `Crossplane YAML` language for:
 
 - `crossplane.yaml`
 - `crossplane.yml`
-- files mapped to `Crossplane YAML` with Zed `file_types`, such as `*-composition.yaml`, `composition.yaml`, and `*-definition.yaml`
+- `upbound.yaml`
+- `upbound.yml`
+- `composition.yaml`
+- `composition.yml`
+- `definition.yaml`
+- `definition.yml`
+- files mapped to `Crossplane YAML` with Zed `file_types`, such as `*-composition.yaml` and `*-definition.yaml`
 
-`zed-xpls-vibe` runs for `Crossplane YAML` files in Crossplane package worktrees.
+`zed-xpls-vibe` runs for `Crossplane YAML` files and leaves package detection to the `vibe-xpls` language server. This allows root package, nested package, multi-package, and no-root validation to exercise the same analyzer path.
+
+`Crossplane YAML` uses two-space, space-only indentation to match YAML and avoid Zed's default four-space indentation in this custom language.
 
 ## Syntax Highlighting
 
@@ -46,9 +54,9 @@ The extension keeps Zed's native YAML support enabled for ordinary YAML and adds
 
 The mixed YAML/template case is best-effort. Template actions remain highlighted, and plain generated YAML text is injected into the YAML parser, but some YAML constructs can still look imperfect when a scalar, list item, or indentation level is split by `{{ ... }}` actions.
 
-Zed extension `path_suffixes` can match exact filenames and dot-delimited suffixes, but not glob-style names like `*-composition.yaml`. Zed's language `first_line_pattern` also cannot override the built-in YAML `.yaml` suffix match, so broad `apiVersion: ...crossplane.io/...` content detection is not reliable for YAML files.
+Zed extension `path_suffixes` can match exact filenames and dot-delimited suffixes, but not glob-style names like `xexample-composition.yaml`. Zed's language `first_line_pattern` also cannot override the built-in YAML `.yaml` suffix match, so broad `apiVersion: ...crossplane.io/...` content detection is not reliable for YAML files.
 
-Add a file type mapping to your Zed settings for Crossplane Composition and XRD naming conventions:
+The extension config covers the exact filenames above. Add a `file_types` mapping to your Zed settings for hyphenated or custom Crossplane Composition and XRD filenames. The `languages` entry is optional with the current extension, but is useful as a local override and documents the intended indentation behavior:
 
 ```jsonc
 {
@@ -56,13 +64,15 @@ Add a file type mapping to your Zed settings for Crossplane Composition and XRD 
     "Crossplane YAML": [
       "**/*-composition.yaml",
       "**/*-composition.yml",
-      "**/composition.yaml",
-      "**/composition.yml",
       "**/*-definition.yaml",
-      "**/*-definition.yml",
-      "**/crossplane.yaml",
-      "**/crossplane.yml"
+      "**/*-definition.yml"
     ]
+  },
+  "languages": {
+    "Crossplane YAML": {
+      "tab_size": 2,
+      "hard_tabs": false
+    }
   }
 }
 ```
@@ -78,6 +88,8 @@ https://github.com/io41/zed-xpls-vibe
 If Zed does not start this server, first confirm that the original `up-xpls` extension is uninstalled or disabled, then install this repository as a dev extension.
 
 If Zed logs show that the worktree is not trusted, trust the fixture/package worktree in Zed and reopen it. Zed will not start language servers for untrusted worktrees.
+
+If a no-root workspace starts the server after a file is manually classified as `Crossplane YAML`, that is expected for this validation fork. The language server owns the no-root behavior and should stay quiet unless the file has a Crossplane activation signal.
 
 If Zed logs show `<temporary-vibe-xpls-binary>` starting but diagnostics, hover, or completion are absent, check `<temporary-vibe-xpls-binary> --version` and run the protocol smoke tests from the `vibe-xpls` milestone worktree.
 
