@@ -1,36 +1,65 @@
 # Zed xpls Vibe
 
-Local Zed dev extension for validating the first runnable `vibe-xpls` milestone.
-
-This fork intentionally avoids the original `up-xpls` extension id, the `up` CLI fallback, and the `VIBE_XPLS_BIN` environment override. It starts the local milestone language server directly:
-
-```text
-<temporary-vibe-xpls-binary> serve
-```
+Zed extension for Crossplane package diagnostics and Crossplane YAML highlighting powered by [`vibe-xpls`](https://github.com/io41/vibe-xpls).
 
 ## Requirements
 
 - Zed
-- Rust installed with `rustup` for local development
-- A `vibe-xpls` binary built at `<temporary-vibe-xpls-binary>`
+- network access to download the pinned `vibe-xpls` release, or a local `vibe-xpls` install
 
-Build the binary from the milestone worktree:
+With network access on a supported release platform, the extension downloads the pinned language server release automatically after local resolution fails. Unsupported platforms should install a compatible local `vibe-xpls` binary explicitly.
 
-```bash
-cd <local-vibe-xpls-worktree>
-go build -o <temporary-vibe-xpls-binary> ./cmd/vibe-xpls
-<temporary-vibe-xpls-binary> --version
+Optionally install the pinned language server with Go for offline use or to control the local binary:
+
+```sh
+go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1
 ```
 
-Expected version output:
+Confirm the binary:
+
+```sh
+vibe-xpls --version
+```
+
+Expected version:
 
 ```text
 vibe-xpls v0.0.1
 ```
 
+## Binary Resolution
+
+The extension starts `vibe-xpls serve`.
+
+It resolves the binary in this order:
+
+1. `lsp.zed-xpls-vibe.binary.path`, when configured.
+2. `vibe-xpls` on the worktree shell `PATH`.
+3. Standard Go bin directories: `GOBIN`, `GOPATH/bin`, and `HOME/go/bin` (`USERPROFILE/go/bin` on Windows).
+4. The pinned GitHub release `io41/vibe-xpls@v0.0.1`.
+
+No settings are needed when `vibe-xpls` is on `PATH` or installed in a standard Go bin directory.
+
+Use an explicit path only for non-standard installs:
+
+```jsonc
+{
+  "lsp": {
+    "zed-xpls-vibe": {
+      "binary": {
+        "path": "/absolute/path/to/vibe-xpls",
+        "arguments": ["serve"]
+      }
+    }
+  }
+}
+```
+
 ## Usage
 
-Install this repository with `zed: install dev extension`, then open a file classified as `Crossplane YAML`.
+Install the extension from Zed once it is published, or use `zed: install dev extension` when developing from this repository.
+
+Open a file classified as `Crossplane YAML`.
 
 The extension keeps Zed's native YAML support enabled for ordinary YAML and adds a `Crossplane YAML` language for:
 
@@ -77,25 +106,42 @@ The extension config covers the exact filenames above. Add a `file_types` mappin
 }
 ```
 
-## Repository
+## Development
 
-```text
-https://github.com/io41/zed-xpls-vibe
+```sh
+cargo test
+PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo build --target wasm32-wasip2
 ```
+
+## Releases
+
+This extension uses SemVer and stays on the `v0.x.y` line until maintainers explicitly approve a `v1.0.0` release.
+
+Release Please maintains `CHANGELOG.md` from Conventional Commits and opens release pull requests on merges to `main`.
+
+The extension pins the `vibe-xpls` language server release in source. Bumping the pinned language server is a deliberate source change, not an automatic latest-version lookup.
+
+## Publishing To Zed
+
+Zed registry publication happens through a PR to [`zed-industries/extensions`](https://github.com/zed-industries/extensions).
+
+The extension must be public, licensed, and added as an HTTPS submodule under `extensions/zed-xpls-vibe` with a matching `extensions.toml` version.
 
 ## Troubleshooting
 
-If Zed does not start this server, first confirm that the original `up-xpls` extension is uninstalled or disabled, then install this repository as a dev extension.
+If Zed does not start this server, first confirm that the original `up-xpls` extension is uninstalled or disabled.
 
-If Zed logs show that the worktree is not trusted, trust the fixture/package worktree in Zed and reopen it. Zed will not start language servers for untrusted worktrees.
+If Zed logs show that the worktree is not trusted, trust the worktree in Zed and reopen it. Zed will not start language servers for untrusted worktrees.
 
-If a no-root workspace starts the server after a file is manually classified as `Crossplane YAML`, that is expected for this validation fork. The language server owns the no-root behavior and should stay quiet unless the file has a Crossplane activation signal.
+If Zed logs show `vibe-xpls` starting but diagnostics, hover, or completion are absent, inspect the Zed logs for the resolved binary path and server errors. For a local install, also check:
 
-If Zed logs show `<temporary-vibe-xpls-binary>` starting but diagnostics, hover, or completion are absent, check `<temporary-vibe-xpls-binary> --version` and run the protocol smoke tests from the `vibe-xpls` milestone worktree.
+```sh
+vibe-xpls --version
+```
 
 For extension logs, run Zed with:
 
-```bash
+```sh
 zed --foreground
 ```
 
@@ -103,15 +149,10 @@ or use `zed: open log`.
 
 If the WASM build reports that `wasm32-wasip2` is missing even after installing the target, make sure Cargo is using the same rustup toolchain that owns the target:
 
-```bash
+```sh
 PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo build --target wasm32-wasip2
 ```
 
-On this machine, `/opt/homebrew/bin/cargo` is Homebrew Rust and cannot compile Zed dev extensions. Put `/opt/homebrew/opt/rustup/bin` before `/opt/homebrew/bin` when launching Zed.
+## License
 
-## Development
-
-```bash
-cargo test
-cargo build --target wasm32-wasip2
-```
+MIT. See [LICENSE](LICENSE).
