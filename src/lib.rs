@@ -1,3 +1,5 @@
+mod resolver;
+
 use zed_extension_api::{self as zed, Result};
 
 const LANGUAGE_SERVER_ID: &str = "zed-xpls-vibe";
