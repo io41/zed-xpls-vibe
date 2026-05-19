@@ -22,18 +22,18 @@ Make generated YAML inside Crossplane go-template blocks visually distinct while
 The selected visual direction is **Clear Hybrid**:
 
 - Keep the same semantic color families as normal YAML.
-- Spike whether generated-YAML highlight hooks can let users or themes choose stronger shade differences for inner generated YAML keys, values, comments, and document markers.
+- Spike whether extension-owned captures can create clearer generated-YAML contrast under normal Zed themes, without asking users to edit theme settings.
 - Prefer token-level shade differences over a block background.
 - Keep the YAML document separator `---` aligned with the generated YAML document's top-level keys.
 
-The extension owns semantic boundaries and readable fallback. It does not own the user's palette. Candidate hook names are not a committed configuration surface until the spike proves they are precise, stable, and styleable in Zed. Under stock themes, generated YAML must remain readable through ordinary capture fallback, but it may not look different. A Clear Hybrid override can be documented as an example only if the hook spike passes.
+The extension owns semantic boundaries, capture choices, and readable fallback. It does not own the user's palette and should not require user settings changes for generated-YAML contrast. Candidate captures are not a committed implementation path until the spike proves they are precise, stable, and visibly useful in Zed with normal theme settings.
 
 ## Non-Goals
 
 - Do not change parsing or diagnostics behavior.
 - Do not change how ordinary YAML files are highlighted.
 - Do not make generated YAML look like a different language.
-- Do not claim visible generated-YAML colors under unmodified stock themes.
+- Do not require users to edit settings for generated-YAML contrast.
 - Do not ship or maintain a bundled theme.
 - Do not prescribe one universal palette for all users.
 - Do not ship a full-width editor block background in the first milestone.
@@ -50,25 +50,25 @@ The current injection setup has two YAML paths:
 
 That asymmetry is intentional. Any implementation must either preserve it or replace it with an equivalent mechanism that keeps both outer YAML and generated YAML highlighted.
 
-The first step should be a theme-hook viability spike, not a new language and not a committed implementation path:
+The first step should be a stock-capture viability spike, not a new language and not a committed implementation path:
 
 1. Confirm a generated-range capture can target generated YAML text precisely enough without changing ordinary outer YAML.
 2. Confirm whether that capture remains visible when injected YAML token captures are also active.
-3. Confirm generated capture names are styleable in Zed and that fallback to base captures remains readable.
-4. Confirm the candidate hook names are generic enough to be useful without becoming a theme-maintenance burden.
+3. Confirm common Zed capture names, such as `embedded`, `emphasis`, `text.literal`, or existing semantic variants like `string.special`, produce useful contrast under normal theme settings.
+4. Confirm the candidate capture choices are generic enough to remain semantically defensible and not theme-specific.
 
-Only if the spike passes should the implementation expose the smallest useful capture surface, such as `text.generated` or `embedded.generated`, plus a documented example override snippet. This path avoids a new language and avoids duplicating YAML queries.
+Only if the spike passes should the implementation expose the smallest useful capture behavior using existing Zed capture names. This path avoids a new language, avoids duplicating YAML queries, and avoids new user settings.
 
-If the hook spike fails, do not ship hook names or theme guidance. The fallback candidate is a distinct injected language, tentatively named `Crossplane Generated YAML`, but only if the added complexity is justified.
+If the stock-capture spike fails, do not ship custom hook names or theme guidance. The fallback candidate is a distinct injected language, tentatively named `Crossplane Generated YAML`, but only if the added complexity is justified.
 
 `Crossplane Generated YAML` should reuse YAML parsing behavior but expose different highlight capture names for generated YAML. Example capture names:
 
-- `property.generated`
-- `string.generated`
-- `comment.generated`
-- `punctuation.special.generated`
+- `property` plus a defensible existing variant where Zed supports one
+- `string.special`
+- `comment.doc`
+- `punctuation.special`
 
-The capture names should be chosen so Zed's theme lookup can fall back to the base capture class when a theme has no explicit generated-YAML override. For example, `property.generated` should still resolve as `property` under ordinary themes.
+The capture names should stay within Zed's documented syntax captures. Avoid custom names such as `property.generated` unless the user explicitly chooses a settings-driven customization surface later.
 
 The distinct-language path is allowed only if the spike confirms:
 
@@ -78,16 +78,13 @@ The distinct-language path is allowed only if the spike confirms:
 
 The generated-YAML document marker is the `yaml_document_marker` node from the outer `gotmpl` grammar, not the injected YAML parser. It is already captured in `languages/crossplane-yaml/highlights.scm`. The implementation may refine that capture to generated punctuation, but it must not disturb document marker alignment. The `---` marker belongs at the same indentation level as the generated YAML document's top-level keys.
 
-If the hook spike passes, theme guidance for this milestone should be documentation-only: provide a concrete `theme_overrides.syntax` snippet that demonstrates the Clear Hybrid colors for users who want that look. The extension should not ship or maintain a bundled companion theme.
-
 ## Visual Behavior
 
-If the hook spike passes, the reference Clear Hybrid override is:
+If the stock-capture spike passes, the reference Clear Hybrid behavior is:
 
 - Outer YAML keeps the user's existing YAML colors.
-- Inner generated YAML keys use the same hue family as YAML keys, with a clearer/lighter shade.
-- Inner generated YAML scalar values use the same hue family as YAML values, with a clearer/lighter shade.
-- Inner generated YAML comments are slightly brighter than normal comments but still subdued.
+- Inner generated YAML uses existing theme-defined syntax variants that read as the same general YAML family but are easier to distinguish.
+- Inner generated YAML comments remain subdued.
 - Inner document markers use generated punctuation styling.
 - No first-milestone block background is required.
 
@@ -99,15 +96,15 @@ Zed's syntax highlighting chooses the innermost active capture for each text chu
 
 Because of that, treat generated-YAML background styling as a future enhancement unless the spike proves it works with token colors.
 
-Zed source indicates arbitrary dotted capture names should fall back through shorter prefixes and theme overrides should be able to introduce custom syntax keys. Still, the spec requires a Zed proof before implementation, because the acceptance criteria depend on visible editor behavior rather than source reading alone.
+Zed supports documented syntax captures and fallback captures in highlight queries. Still, the spec requires a Zed proof before implementation, because Tree-sitter query output proves capture assignment but not final theme rendering.
 
 ## Spike Decision Rules
 
-Before writing the implementation plan, run the theme-hook viability spike and choose one outcome:
+Before writing the implementation plan, run the stock-capture viability spike and choose one outcome:
 
-- **Outcome A: generated range hook.** Use this if one precise generated-range capture gives enough visual distinction when explicitly styled and does not interfere with YAML token highlighting.
-- **Outcome B: generated token hooks.** Use this if token shade differences are required and an extension-defined generated-YAML language can reuse or copy YAML behavior safely.
-- **Outcome C: no viable hook.** Use this if the extension cannot target generated YAML separately without excessive complexity. In that case, do not ship hook names, do not publish theme guidance, document the limitation, and do not add brittle query tricks.
+- **Outcome A: generated range capture.** Use this if one precise generated-range capture gives enough visual distinction under normal theme settings and does not interfere with YAML token highlighting.
+- **Outcome B: generated token captures.** Use this if token shade differences are required and an extension-defined generated-YAML language can reuse or copy YAML behavior safely while staying within documented Zed capture names.
+- **Outcome C: no viable extension-owned contrast.** Use this if the extension cannot target generated YAML separately without excessive complexity. In that case, do not ship custom hook names, do not ask users to edit theme settings, document the limitation, and do not add brittle query tricks.
 
 Do not pursue a background cue as part of Outcome A or B unless the spike proves it composes correctly with token highlighting.
 
@@ -118,10 +115,10 @@ Use the committed `fixtures/crossplane-package/api/mixed-template-composition.ya
 Validation should include:
 
 - Tree-sitter query checks showing the selected generated-YAML capture behavior.
-- A Zed manual screenshot check with a temporary Clear Hybrid override.
+- A Zed manual screenshot check using normal user settings and the active theme.
 - Confirmation that outer YAML colors are unchanged.
 - Confirmation that go-template actions and variables still use template highlighting.
-- Confirmation that themes without custom generated-YAML styles still display readable YAML through fallback capture names, even if generated YAML is not visually distinct.
+- Confirmation that no new user settings are required beyond the existing file association needed to apply `Crossplane YAML`.
 - Existing Rust extension tests and WASM build checks.
 - A manual check that generated YAML `---` document markers are aligned with generated YAML top-level keys.
 
@@ -129,5 +126,5 @@ Validation should include:
 
 - A range-level capture may be hidden by injected YAML token captures, leaving no useful visible cue.
 - Per-token generated YAML colors may require a distinct injected language, which adds grammar/query maintenance cost.
-- Stock themes will likely show no generated-YAML color difference unless they already style the chosen custom captures.
+- Existing theme-defined capture variants may not provide enough generated-YAML contrast.
 - Zed may not support a reliable generated-YAML block background through syntax captures while also preserving token colors.
