@@ -5,7 +5,7 @@ const MILESTONE_XPLS_BIN: &str = "<temporary-vibe-xpls-binary>";
 
 struct ZedXplsVibeExtension;
 
-fn vibe_xpls_args() -> Vec<String> {
+fn default_vibe_xpls_args() -> Vec<String> {
     vec!["serve".to_string()]
 }
 
@@ -27,7 +27,7 @@ impl zed::Extension for ZedXplsVibeExtension {
 
         Ok(zed::Command {
             command: MILESTONE_XPLS_BIN.to_string(),
-            args: vibe_xpls_args(),
+            args: default_vibe_xpls_args(),
             env: worktree.shell_env(),
         })
     }
@@ -45,12 +45,7 @@ mod tests {
     }
 
     #[test]
-    fn uses_milestone_binary_path() {
-        assert_eq!(MILESTONE_XPLS_BIN, "<temporary-vibe-xpls-binary>");
-    }
-
-    #[test]
-    fn starts_vibe_xpls_serve() {
-        assert_eq!(vibe_xpls_args(), vec!["serve".to_string()]);
+    fn starts_vibe_xpls_serve_by_default() {
+        assert_eq!(default_vibe_xpls_args(), vec!["serve".to_string()]);
     }
 }
