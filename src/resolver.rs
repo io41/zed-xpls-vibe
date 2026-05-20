@@ -1,4 +1,4 @@
-pub const VIBE_XPLS_VERSION: &str = "v0.0.2";
+pub const VIBE_XPLS_VERSION: &str = "v0.0.3";
 pub const VIBE_XPLS_REPO: &str = "io41/vibe-xpls";
 pub const VIBE_XPLS_BIN: &str = "vibe-xpls";
 pub const VIBE_XPLS_WINDOWS_BIN: &str = "vibe-xpls.exe";
@@ -671,22 +671,22 @@ pub fn release_asset_url(asset_name: &str) -> String {
 fn release_asset_sha256(os: HostOs, arch: HostArch) -> Result<&'static str, String> {
     match (os, arch) {
         (HostOs::Mac, HostArch::X8664) => {
-            Ok("a034a9b2eab33ae30eb16909a65c2e885414104649a854a65b62940befba71de")
+            Ok("5af1d2c4677b14a90713de572d93793a3ee13b0ef8b1698656f3f505fd9b20bd")
         }
         (HostOs::Mac, HostArch::Aarch64) => {
-            Ok("d98a35fd57334b0c6d070d283b5ff9c12e46beca0a453c44230f621a0cf56454")
+            Ok("5ac54415a03c91b55f4452470a0f5f084d3dc3bf78a310eab83c04c55c2c7a6c")
         }
         (HostOs::Linux, HostArch::X8664) => {
-            Ok("d87f77237b3405a7388110ab65713e764e60338bc49239322272d017ac971d03")
+            Ok("bd1c917b955dcdfcc2a96679ed6c5e96996cf140c7cdc3b6a6de72694e9211de")
         }
         (HostOs::Linux, HostArch::Aarch64) => {
-            Ok("2b7735f6ec251fd381fa2b3f3e6ed7d1f55d702bde96893c809f1ff8ca37d018")
+            Ok("6089fc8a94be3e7a2aaa739c3763ea24ba45a0fd772e914534d91e183f2ffa91")
         }
         (HostOs::Windows, HostArch::X8664) => {
-            Ok("f8bad966fe7970785a541aeffec7f7faf9e400d2256310aeb22220e8af826a94")
+            Ok("e03de15a859bf0796797a8d06c59a6e763cc41cfd2d870cd9fa93cd6ad9a218f")
         }
         (HostOs::Windows, HostArch::Aarch64) => {
-            Ok("87158951680b0fa942821ec28fa9d6492ca3b6cea81da42451b1ef33c2c3c0e5")
+            Ok("8d6c529487db5ea8c90a35999cedf2cdb8efdb27a8848d29fd9a737ee5577fed")
         }
         (_, HostArch::X86) => Err(format!(
             "unsupported architecture x86 for vibe-xpls {VIBE_XPLS_VERSION}; install manually with `{}`",
