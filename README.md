@@ -37,8 +37,8 @@ brew install rustup
 $(brew --prefix rustup)/bin/rustup-init
 ```
 
-Do not use `brew install rust` for this setup; that installs Homebrew's Rust
-toolchain directly, while `rustup` installs and manages the Rust toolchains Zed
+Prefer `rustup` for this setup. Homebrew's `rust` formula installs a standalone
+Rust toolchain, while `rustup` installs and manages the Rust toolchains Zed
 expects for dev extensions.
 
 Clone this repository:
