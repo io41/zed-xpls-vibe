@@ -1,6 +1,6 @@
 id = "zed-xpls-vibe"
 name = "Zed xpls Vibe"
-version = "0.0.1"
+version = "0.0.2"
 schema_version = 1
 authors = ["Tim Kersten"]
 description = "Crossplane package diagnostics powered by the local vibe-xpls milestone binary"
