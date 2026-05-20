@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, fs};
 use resolver::{
     default_args, download_plan, manual_install_hint, resolve_local_binary, ArchiveKind,
     BinarySettings, HostArch, HostOs, LocalLookup, VersionProbeResult, VIBE_XPLS_BIN,
-    VIBE_XPLS_REPO, VIBE_XPLS_VERSION,
+    VIBE_XPLS_VERSION,
 };
 use zed::settings::LspSettings;
 use zed_extension_api::{self as zed, Result};
@@ -37,6 +37,7 @@ struct ZedLookup<'a> {
     shell_env: Vec<(String, String)>,
     os: HostOs,
     path_overridden: bool,
+    version_probes: BTreeMap<String, VersionProbeResult>,
 }
 
 impl<'a> ZedLookup<'a> {
@@ -51,6 +52,7 @@ impl<'a> ZedLookup<'a> {
             shell_env,
             os,
             path_overridden,
+            version_probes: BTreeMap::new(),
         }
     }
 }
@@ -72,19 +74,27 @@ impl LocalLookup for ZedLookup<'_> {
     }
 
     fn probe_version(&mut self, path: &str) -> VersionProbeResult {
+        if let Some(result) = self.version_probes.get(path) {
+            return result.clone();
+        }
+
+        // Zed Extension API 0.7.0 does not expose process timeouts, so this
+        // probe relies on the host process API rather than a custom watchdog.
         match fs::metadata(path) {
             Ok(_) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 return VersionProbeResult::Missing;
             }
             Err(error) => {
-                return VersionProbeResult::Failed(format!(
+                let result = VersionProbeResult::Failed(format!(
                     "could not inspect `{path}` before running `{VIBE_XPLS_BIN} --version`: {error}"
                 ));
+                self.version_probes.insert(path.to_string(), result.clone());
+                return result;
             }
         }
 
-        match zed::process::Command::new(path)
+        let result = match zed::process::Command::new(path)
             .arg("--version")
             .envs(self.shell_env.clone())
             .output()
@@ -105,7 +115,10 @@ impl LocalLookup for ZedLookup<'_> {
             Err(error) => {
                 VersionProbeResult::Failed(format!("could not run `{path} --version`: {error}"))
             }
-        }
+        };
+
+        self.version_probes.insert(path.to_string(), result.clone());
+        result
     }
 }
 
@@ -237,6 +250,39 @@ fn zed_archive_kind(kind: ArchiveKind) -> zed::DownloadedFileType {
     }
 }
 
+fn sanitize_host_error(error: &str) -> String {
+    let before_response = error
+        .split("response:")
+        .next()
+        .unwrap_or(error)
+        .trim()
+        .trim_end_matches(',');
+
+    if before_response.is_empty() {
+        "unknown error".to_string()
+    } else {
+        before_response.to_string()
+    }
+}
+
+fn friendly_download_error(asset_name: &str, error: impl ToString) -> String {
+    let raw = error.to_string();
+    let sanitized = sanitize_host_error(&raw);
+    let lower = raw.to_ascii_lowercase();
+    let cause = if lower.contains("404") || lower.contains("not found") {
+        format!("the pinned release asset was not found: `{asset_name}`")
+    } else if lower.contains("403") || lower.contains("rate limit") {
+        "GitHub refused the download, possibly because of rate limiting".to_string()
+    } else {
+        sanitized
+    };
+
+    format!(
+        "Could not download {VIBE_XPLS_BIN} {VIBE_XPLS_VERSION} for {LANGUAGE_SERVER_ID}.\n\nThe extension downloads a pinned language-server binary when no compatible local {VIBE_XPLS_BIN} is found. The download failed: {cause}.\n\nInstall the pinned server with:\n{}\n\nOr configure lsp.{LANGUAGE_SERVER_ID}.binary.path to a compatible local binary.",
+        manual_install_hint()
+    )
+}
+
 impl ZedXplsVibeExtension {
     fn downloaded_binary_path(
         &mut self,
@@ -260,42 +306,19 @@ impl ZedXplsVibeExtension {
             language_server_id,
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
-        let release = zed::github_release_by_tag_name(VIBE_XPLS_REPO, VIBE_XPLS_VERSION)
-            .map_err(|error| {
-                format!(
-                    "failed to fetch {VIBE_XPLS_BIN} {VIBE_XPLS_VERSION}: {error}; install manually with `{}`",
-                    manual_install_hint()
-                )
-            })?;
-        let asset = release
-            .assets
-            .iter()
-            .find(|asset| asset.name == plan.asset_name)
-            .ok_or_else(|| {
-                format!(
-                    "{VIBE_XPLS_BIN} {VIBE_XPLS_VERSION} release is missing asset `{}`; install manually with `{}`",
-                    plan.asset_name,
-                    manual_install_hint()
-                )
-            })?;
-
         fs::remove_dir_all(&plan.temp_dir).ok();
         zed::set_language_server_installation_status(
             language_server_id,
             &zed::LanguageServerInstallationStatus::Downloading,
         );
         zed::download_file(
-            &asset.download_url,
+            &plan.download_url,
             &plan.temp_dir,
             zed_archive_kind(plan.archive_kind),
         )
         .map_err(|error| {
             fs::remove_dir_all(&plan.temp_dir).ok();
-            format!(
-                "failed to download `{}`: {error}; install manually with `{}`",
-                plan.asset_name,
-                manual_install_hint()
-            )
+            friendly_download_error(&plan.asset_name, error)
         })?;
 
         if !fs::metadata(&plan.temp_binary_path).is_ok_and(|metadata| metadata.is_file()) {
@@ -387,9 +410,30 @@ mod tests {
 
     #[test]
     fn pins_vibe_xpls_release() {
-        assert_eq!(VIBE_XPLS_REPO, "io41/vibe-xpls");
         assert_eq!(VIBE_XPLS_VERSION, "v0.0.1");
         assert_eq!(VIBE_XPLS_BIN, "vibe-xpls");
+    }
+
+    #[test]
+    fn download_error_sanitizes_github_json() {
+        let message = friendly_download_error(
+            "vibe-xpls_v0.0.1_darwin_arm64.tar.gz",
+            "status error 403, response: \"{\\\"message\\\":\\\"API rate limit exceeded\\\"}\"",
+        );
+
+        assert!(message.contains("Could not download vibe-xpls v0.0.1 for zed-xpls-vibe."));
+        assert!(message.contains("GitHub refused the download"));
+        assert!(message.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1"));
+        assert!(!message.contains("{\\\"message\\\""));
+    }
+
+    #[test]
+    fn download_error_names_missing_asset() {
+        let message =
+            friendly_download_error("vibe-xpls_v0.0.1_linux_amd64.tar.gz", "status error 404");
+
+        assert!(message.contains("pinned release asset was not found"));
+        assert!(message.contains("vibe-xpls_v0.0.1_linux_amd64.tar.gz"));
     }
 
     #[test]
