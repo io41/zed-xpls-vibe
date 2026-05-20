@@ -1,73 +1,70 @@
 # Crossplane YAML
 
-Zed extension for Crossplane package diagnostics and Crossplane YAML highlighting powered by [`vibe-xpls`](https://github.com/io41/vibe-xpls).
+Crossplane-aware YAML support for Zed.
 
-## Requirements
+This extension adds:
 
-- Zed
-- network access to download the pinned `vibe-xpls` release on a supported platform, or a compatible local `vibe-xpls` install
+- Crossplane package diagnostics
+- Crossplane YAML syntax highlighting
+- Go-template highlighting inside Crossplane `function-go-templating` inline templates
+- YAML highlighting inside generated YAML sections of those templates
 
-With network access on a supported release platform, the extension downloads the pinned language server release directly after local resolution fails. Unsupported release platforms should install a compatible local `vibe-xpls` binary.
+The extension manages its language server automatically. No separate setup is needed for normal use.
 
-Optionally install the pinned language server with Go for offline use or to control the local binary:
+## Status
+
+Crossplane YAML is waiting to be included in the Zed extension registry:
+
+https://github.com/zed-industries/extensions/pull/6157
+
+If you want to show interest, add a thumbs-up reaction to that PR. Please avoid comment-only "+1" messages.
+
+## Installation
+
+### From Zed
+
+Once the extension is available in the Zed marketplace:
+
+1. Open Zed.
+2. Open the command palette.
+3. Run `zed: extensions`.
+4. Search for `Crossplane YAML`.
+5. Install the extension.
+
+### As a Dev Extension
+
+Until the marketplace PR is merged, install it as a local dev extension.
+
+Install Rust with `rustup` if you do not already have it:
 
 ```sh
-go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Confirm the binary:
+Install the WASM target used by Zed extensions:
 
 ```sh
-vibe-xpls --version
+rustup target add wasm32-wasip2
 ```
 
-Expected version:
+Clone this repository:
 
-```text
-vibe-xpls v0.0.2
+```sh
+git clone https://github.com/io41/crossplane-yaml.git
 ```
 
-## Binary Resolution
+In Zed:
 
-The extension starts `vibe-xpls serve`.
-
-It resolves the binary in this order:
-
-1. `lsp.crossplane-yaml.binary.path`, when configured.
-2. `vibe-xpls` on the worktree shell `PATH`.
-3. Standard Go bin directories: `GOBIN`, `GOPATH/bin`, and `HOME/go/bin` (`USERPROFILE/go/bin` on Windows).
-4. The pinned GitHub release `io41/vibe-xpls@v0.0.2`, downloaded directly on supported release platforms.
-
-No settings are needed when `vibe-xpls` is on `PATH` or installed in a standard Go bin directory and reports the pinned version:
-
-```text
-vibe-xpls v0.0.2
-```
-
-If an auto-discovered local binary reports any other version, the extension stops with a compatibility error instead of silently running it or falling through to another source.
-
-Use an explicit path only as an expert override for non-standard installs. Compatibility is your responsibility when `binary.path` is configured:
-
-```jsonc
-{
-  "lsp": {
-    "crossplane-yaml": {
-      "binary": {
-        "path": "/absolute/path/to/vibe-xpls",
-        "arguments": ["serve"]
-      }
-    }
-  }
-}
-```
+1. Open the command palette.
+2. Run `zed: install dev extension`.
+3. Select the cloned `crossplane-yaml` directory.
+4. Restart Zed if the language does not appear immediately.
 
 ## Usage
 
-Install the extension from Zed once it is published, or use `zed: install dev extension` when developing from a local checkout of `https://github.com/io41/crossplane-yaml`.
-
 Open a file classified as `Crossplane YAML`.
 
-The extension keeps Zed's native YAML support enabled for ordinary YAML and adds a `Crossplane YAML` language for:
+The extension recognizes common Crossplane package filenames, including:
 
 - `crossplane.yaml`
 - `crossplane.yml`
@@ -77,21 +74,8 @@ The extension keeps Zed's native YAML support enabled for ordinary YAML and adds
 - `composition.yml`
 - `definition.yaml`
 - `definition.yml`
-- files mapped to `Crossplane YAML` with Zed `file_types`, such as `*-composition.yaml` and `*-definition.yaml`
 
-`crossplane-yaml` runs for `Crossplane YAML` files and leaves package detection to the `vibe-xpls` language server. This allows root package, nested package, multi-package, and no-root validation to exercise the same analyzer path.
-
-`Crossplane YAML` uses two-space, space-only indentation to match YAML and avoid Zed's default four-space indentation in this custom language.
-
-## Syntax Highlighting
-
-`Crossplane YAML` uses Go-template highlighting for `{{ ... }}` actions and injects YAML highlighting into surrounding template text. This is intended for Crossplane `function-go-templating` inline templates where the block scalar emits YAML.
-
-The mixed YAML/template case is best-effort. Template actions remain highlighted, and plain generated YAML text is injected into the YAML parser, but some YAML constructs can still look imperfect when a scalar, list item, or indentation level is split by `{{ ... }}` actions.
-
-Zed extension `path_suffixes` can match exact filenames and dot-delimited suffixes, but not glob-style names like `xexample-composition.yaml`. Zed's language `first_line_pattern` also cannot override the built-in YAML `.yaml` suffix match, so broad `apiVersion: ...crossplane.io/...` content detection is not reliable for YAML files.
-
-The extension config covers the exact filenames above. Add a `file_types` mapping to your Zed settings for hyphenated or custom Crossplane Composition and XRD filenames. The `languages` entry is optional with the current extension, but is useful as a local override and documents the intended indentation behavior:
+For hyphenated or project-specific names such as `xexample-composition.yaml`, add a Zed file type mapping:
 
 ```jsonc
 {
@@ -102,85 +86,25 @@ The extension config covers the exact filenames above. Add a `file_types` mappin
       "**/*-definition.yaml",
       "**/*-definition.yml"
     ]
-  },
-  "languages": {
-    "Crossplane YAML": {
-      "tab_size": 2,
-      "hard_tabs": false
-    }
   }
 }
 ```
 
-## Development
+The extension keeps Zed's normal YAML support enabled for ordinary YAML files.
 
-```sh
-cargo test
-PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo build --target wasm32-wasip2
-```
+## Template Highlighting
 
-## Releases
+Crossplane `function-go-templating` templates often contain YAML inside Go-template blocks. Crossplane YAML highlights both the template expressions and the YAML they generate.
 
-This extension uses SemVer and stays on the `v0.x.y` line until maintainers explicitly approve a `v1.0.0` release.
-
-Release Please maintains `CHANGELOG.md` from Conventional Commits and opens release pull requests on merges to `main`.
-
-The extension pins the `vibe-xpls` language server release in source. Bumping the pinned language server is a deliberate source change, not an automatic lookup.
-
-## Publishing To Zed
-
-Zed registry publication happens through a PR to [`zed-industries/extensions`](https://github.com/zed-industries/extensions).
-
-The extension must be public, licensed, and added as an HTTPS submodule under `extensions/crossplane-yaml` with a matching `extensions.toml` version.
+Some heavily templated YAML can still look imperfect when indentation, list items, or scalar values are split across template expressions.
 
 ## Troubleshooting
 
-If Zed does not start this server, first confirm that any conflicting earlier development extension is uninstalled or disabled.
+If the language does not appear after installing as a dev extension, restart Zed and make sure you selected the repository root containing `extension.toml`.
 
-If Zed logs show that the worktree is not trusted, trust the worktree in Zed and reopen it. Zed will not start language servers for untrusted worktrees.
+If a Crossplane file opens as regular YAML, add a `file_types` mapping for that filename pattern.
 
-If Zed logs show `vibe-xpls` starting but diagnostics, hover, or completion are absent, inspect the Zed logs for the resolved binary path and server errors. For a local install, also check:
-
-```sh
-vibe-xpls --version
-```
-
-If the pinned release download fails, install the pinned language server locally and restart Zed:
-
-```sh
-go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2
-```
-
-If Zed reports an incompatible auto-discovered local `vibe-xpls` version, update or remove the binary path named in the error. The resolver checks `PATH` before standard Go bin directories and stops on a version mismatch, so installing the pinned Go binary will not help if another `vibe-xpls` earlier on `PATH` still wins.
-
-Install the pinned language server:
-
-```sh
-go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2
-vibe-xpls --version
-```
-
-The expected output is:
-
-```text
-vibe-xpls v0.0.2
-```
-
-If another `PATH` entry keeps winning, configure `lsp.crossplane-yaml.binary.path` to the pinned binary you want Zed to run.
-
-For extension logs, run Zed with:
-
-```sh
-zed --foreground
-```
-
-or use `zed: open log`.
-
-If the WASM build reports that `wasm32-wasip2` is missing even after installing the target, make sure Cargo is using the same rustup toolchain that owns the target:
-
-```sh
-PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo build --target wasm32-wasip2
-```
+For development, release, and maintainer notes, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## License
 
