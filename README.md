@@ -21,31 +21,25 @@ If you want to show interest, add a thumbs-up reaction to that PR. Please avoid 
 
 ## Installation
 
-### From Zed
-
-Once the extension is available in the Zed marketplace:
-
-1. Open Zed.
-2. Open the command palette.
-3. Run `zed: extensions`.
-4. Search for `Crossplane YAML`.
-5. Install the extension.
-
-### As a Dev Extension
-
 Until the marketplace PR is merged, install it as a local dev extension.
 
-Install Rust with `rustup` if you do not already have it:
+Install Rust with `rustup` if you do not already have it. Zed's dev-extension
+workflow expects a rustup-managed Rust toolchain.
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Install the WASM target used by Zed extensions:
+On macOS with Homebrew, install rustup with:
 
 ```sh
-rustup target add wasm32-wasip2
+brew install rustup
+$(brew --prefix rustup)/bin/rustup-init
 ```
+
+Do not use `brew install rust` for this setup; that installs Homebrew's Rust
+toolchain directly, while `rustup` installs and manages the Rust toolchains Zed
+expects for dev extensions.
 
 Clone this repository:
 
@@ -75,7 +69,14 @@ The extension recognizes common Crossplane package filenames, including:
 - `definition.yaml`
 - `definition.yml`
 
-For hyphenated or project-specific names such as `xexample-composition.yaml`, add a Zed file type mapping:
+Many Crossplane repositories use project-specific filenames, such as
+`xexample-composition.yaml`, that Zed will otherwise open as regular YAML.
+
+For a one-off file, use Zed's language selector in the status bar and choose
+`Crossplane YAML`.
+
+For a repository naming pattern, open Zed settings with `zed: open settings` and
+add patterns under `file_types`:
 
 ```jsonc
 {
@@ -89,6 +90,25 @@ For hyphenated or project-specific names such as `xexample-composition.yaml`, ad
   }
 }
 ```
+
+Use patterns that only match Crossplane package files. For example, if all YAML
+files under your package `api/` or `apis/` directories are Crossplane resources,
+you can add directory-scoped patterns:
+
+```jsonc
+{
+  "file_types": {
+    "Crossplane YAML": [
+      "**/api/**/*.yaml",
+      "**/api/**/*.yml",
+      "**/apis/**/*.yaml",
+      "**/apis/**/*.yml"
+    ]
+  }
+}
+```
+
+Reopen matching files after changing the setting.
 
 The extension keeps Zed's normal YAML support enabled for ordinary YAML files.
 
