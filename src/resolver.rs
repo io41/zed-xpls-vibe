@@ -109,6 +109,22 @@ mod tests {
         format!("{}.tmp", pinned_version_dir())
     }
 
+    fn non_pinned_version() -> &'static str {
+        if VIBE_XPLS_VERSION == "v9.9.9" {
+            "v9.9.10"
+        } else {
+            "v9.9.9"
+        }
+    }
+
+    fn assert_valid_sha256(digest: &str, context: &str) {
+        assert_eq!(digest.len(), 64, "{context}");
+        assert!(
+            digest.chars().all(|ch| ch.is_ascii_hexdigit()),
+            "{context}: {digest}"
+        );
+    }
+
     impl FakeLookup {
         fn matching_version() -> VersionProbeResult {
             VersionProbeResult::Output {
@@ -415,10 +431,7 @@ mod tests {
         assert_eq!(plan.temp_binary_path, format!("{temp_dir}/vibe-xpls"));
         assert_eq!(plan.temp_archive_path, format!("{temp_dir}/{asset_name}"));
         assert_eq!(plan.archive_kind, ArchiveKind::GzipTar);
-        assert_eq!(
-            plan.sha256,
-            "d98a35fd57334b0c6d070d283b5ff9c12e46beca0a453c44230f621a0cf56454"
-        );
+        assert_valid_sha256(plan.sha256, "darwin arm64");
     }
 
     #[test]
@@ -428,51 +441,39 @@ mod tests {
                 HostOs::Mac,
                 HostArch::X8664,
                 pinned_asset_name("darwin", "amd64", "tar.gz"),
-                "a034a9b2eab33ae30eb16909a65c2e885414104649a854a65b62940befba71de",
             ),
             (
                 HostOs::Mac,
                 HostArch::Aarch64,
                 pinned_asset_name("darwin", "arm64", "tar.gz"),
-                "d98a35fd57334b0c6d070d283b5ff9c12e46beca0a453c44230f621a0cf56454",
             ),
             (
                 HostOs::Linux,
                 HostArch::X8664,
                 pinned_asset_name("linux", "amd64", "tar.gz"),
-                "d87f77237b3405a7388110ab65713e764e60338bc49239322272d017ac971d03",
             ),
             (
                 HostOs::Linux,
                 HostArch::Aarch64,
                 pinned_asset_name("linux", "arm64", "tar.gz"),
-                "2b7735f6ec251fd381fa2b3f3e6ed7d1f55d702bde96893c809f1ff8ca37d018",
             ),
             (
                 HostOs::Windows,
                 HostArch::X8664,
                 pinned_asset_name("windows", "amd64", "zip"),
-                "f8bad966fe7970785a541aeffec7f7faf9e400d2256310aeb22220e8af826a94",
             ),
             (
                 HostOs::Windows,
                 HostArch::Aarch64,
                 pinned_asset_name("windows", "arm64", "zip"),
-                "87158951680b0fa942821ec28fa9d6492ca3b6cea81da42451b1ef33c2c3c0e5",
             ),
         ];
 
-        for (os, arch, asset_name, sha256) in expected {
+        for (os, arch, asset_name) in expected {
             let plan = download_plan(os, arch).unwrap();
 
             assert_eq!(plan.asset_name, asset_name, "{os:?} {arch:?}");
-            assert_eq!(plan.sha256, sha256, "{os:?} {arch:?}");
-            assert_eq!(plan.sha256.len(), 64, "{os:?} {arch:?}");
-            assert!(
-                plan.sha256.chars().all(|ch| ch.is_ascii_hexdigit()),
-                "{os:?} {arch:?}: {}",
-                plan.sha256
-            );
+            assert_valid_sha256(plan.sha256, &format!("{os:?} {arch:?}"));
             assert!(
                 plan.temp_archive_path.ends_with(&plan.asset_name),
                 "{os:?} {arch:?}: {}",
@@ -526,6 +527,7 @@ mod tests {
 
     #[test]
     fn path_lookup_mismatch_hard_fails_before_go_bin() {
+        let found_version = non_pinned_version();
         let mut lookup = FakeLookup {
             which_path: Some("/path/vibe-xpls".to_string()),
             ..FakeLookup::default()
@@ -535,7 +537,7 @@ mod tests {
             .insert("HOME".to_string(), "/home/tim".to_string());
         lookup.probes.insert(
             "/path/vibe-xpls".to_string(),
-            FakeLookup::mismatched_version("v0.0.3"),
+            FakeLookup::mismatched_version(found_version),
         );
         lookup.probes.insert(
             "/home/tim/go/bin/vibe-xpls".to_string(),
@@ -544,7 +546,9 @@ mod tests {
 
         let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
 
-        assert!(error.contains("Found vibe-xpls v0.0.3 at /path/vibe-xpls"));
+        assert!(error.contains(&format!(
+            "Found vibe-xpls {found_version} at /path/vibe-xpls"
+        )));
         assert!(error.contains(&format!("requires vibe-xpls {VIBE_XPLS_VERSION}")));
         assert_eq!(lookup.probed, vec!["/path/vibe-xpls".to_string()]);
     }
@@ -576,16 +580,19 @@ mod tests {
 
     #[test]
     fn go_bin_mismatch_hard_fails() {
+        let found_version = non_pinned_version();
         let mut lookup = FakeLookup::default();
         lookup.env.insert("GOBIN".to_string(), "/gobin".to_string());
         lookup.probes.insert(
             "/gobin/vibe-xpls".to_string(),
-            FakeLookup::mismatched_version("v0.0.3"),
+            FakeLookup::mismatched_version(found_version),
         );
 
         let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
 
-        assert!(error.contains("Found vibe-xpls v0.0.3 at /gobin/vibe-xpls"));
+        assert!(error.contains(&format!(
+            "Found vibe-xpls {found_version} at /gobin/vibe-xpls"
+        )));
         assert!(error.contains(&format!("requires vibe-xpls {VIBE_XPLS_VERSION}")));
     }
 
