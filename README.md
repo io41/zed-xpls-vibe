@@ -19,6 +19,9 @@ https://github.com/zed-industries/extensions/pull/6157
 
 If you want to show interest, add a thumbs-up reaction to that PR. Please avoid comment-only "+1" messages.
 
+This only affects marketplace discovery and install through `zed: extensions`.
+The extension is usable today as a local dev extension.
+
 ## Installation
 
 Until the marketplace PR is merged, install it as a local dev extension.

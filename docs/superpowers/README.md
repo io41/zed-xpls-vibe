@@ -28,10 +28,18 @@ that are no longer useful. Git history remains the archive for those documents.
 
 There is no active local implementation plan in this directory.
 
-External work still in progress:
+Release Please PRs may be created by normal docs or source changes. Leave them
+open until there is a reason to publish a new extension release.
 
-- Zed extension registry review for adding `crossplane-yaml`.
-- Release Please PRs created by normal docs or source changes.
+## Marketplace Distribution
+
+Zed marketplace work is tracked separately from local extension functionality.
+The extension is usable today as a dev extension by cloning this repository and
+installing it through `zed: install dev extension`.
+
+The Zed extension registry PR only affects marketplace discoverability and the
+normal `zed: extensions` install flow. It is not a blocker for dev-extension
+usage.
 
 ## Retained Docs
 
