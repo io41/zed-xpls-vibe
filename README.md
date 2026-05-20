@@ -5,9 +5,9 @@ Zed extension for Crossplane package diagnostics and Crossplane YAML highlightin
 ## Requirements
 
 - Zed
-- network access to download the pinned `vibe-xpls` release, or a local `vibe-xpls` install
+- network access to download the pinned `vibe-xpls` release on a supported platform, or a compatible local `vibe-xpls` install
 
-With network access on a supported release platform, the extension downloads the pinned language server release automatically after local resolution fails. Unsupported platforms should install a compatible local `vibe-xpls` binary explicitly.
+With network access on a supported release platform, the extension downloads the pinned language server release directly after local resolution fails. Unsupported release platforms should install a compatible local `vibe-xpls` binary.
 
 Optionally install the pinned language server with Go for offline use or to control the local binary:
 
@@ -36,11 +36,17 @@ It resolves the binary in this order:
 1. `lsp.zed-xpls-vibe.binary.path`, when configured.
 2. `vibe-xpls` on the worktree shell `PATH`.
 3. Standard Go bin directories: `GOBIN`, `GOPATH/bin`, and `HOME/go/bin` (`USERPROFILE/go/bin` on Windows).
-4. The pinned GitHub release `io41/vibe-xpls@v0.0.1`.
+4. The pinned GitHub release `io41/vibe-xpls@v0.0.1`, downloaded directly on supported release platforms.
 
-No settings are needed when `vibe-xpls` is on `PATH` or installed in a standard Go bin directory.
+No settings are needed when `vibe-xpls` is on `PATH` or installed in a standard Go bin directory and reports the pinned version:
 
-Use an explicit path only for non-standard installs:
+```text
+vibe-xpls v0.0.1
+```
+
+If an auto-discovered local binary reports any other version, the extension stops with a compatibility error instead of silently running it or falling through to another source.
+
+Use an explicit path only as an expert override for non-standard installs. Compatibility is your responsibility when `binary.path` is configured:
 
 ```jsonc
 {
@@ -119,7 +125,7 @@ This extension uses SemVer and stays on the `v0.x.y` line until maintainers expl
 
 Release Please maintains `CHANGELOG.md` from Conventional Commits and opens release pull requests on merges to `main`.
 
-The extension pins the `vibe-xpls` language server release in source. Bumping the pinned language server is a deliberate source change, not an automatic latest-version lookup.
+The extension pins the `vibe-xpls` language server release in source. Bumping the pinned language server is a deliberate source change, not an automatic lookup.
 
 ## Publishing To Zed
 
@@ -138,6 +144,29 @@ If Zed logs show `vibe-xpls` starting but diagnostics, hover, or completion are 
 ```sh
 vibe-xpls --version
 ```
+
+If the pinned release download fails, install the pinned language server locally and restart Zed:
+
+```sh
+go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1
+```
+
+If Zed reports an incompatible auto-discovered local `vibe-xpls` version, update or remove the binary path named in the error. The resolver checks `PATH` before standard Go bin directories and stops on a version mismatch, so installing the pinned Go binary will not help if another `vibe-xpls` earlier on `PATH` still wins.
+
+Install the pinned language server:
+
+```sh
+go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1
+vibe-xpls --version
+```
+
+The expected output is:
+
+```text
+vibe-xpls v0.0.1
+```
+
+If another `PATH` entry keeps winning, configure `lsp.zed-xpls-vibe.binary.path` to the pinned binary you want Zed to run.
 
 For extension logs, run Zed with:
 
