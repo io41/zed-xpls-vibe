@@ -1,0 +1,133 @@
+name: Bump vibe-xpls
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact vibe-xpls release tag, for example v0.0.3
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bump-vibe-xpls-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump pinned server
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      ARTIFACT_DIR: ${{ runner.temp }}/vibe-xpls-bump
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate input
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Expected stable SemVer tag like v0.0.3, got: $VERSION"
+            exit 2
+          }
+          branch="maintenance/bump-vibe-xpls-${VERSION}"
+          echo "BRANCH=$branch" >> "$GITHUB_ENV"
+
+      - name: Check for existing branch or PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "::error::Branch already exists: $BRANCH"
+            exit 1
+          fi
+          existing_prs="$(
+            gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --head "$BRANCH" \
+              --state open \
+              --json number \
+              --jq 'length'
+          )"
+          if [[ "$existing_prs" != "0" ]]; then
+            echo "::error::An open PR already exists for branch: $BRANCH"
+            exit 1
+          fi
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+
+      - name: Bump pinned vibe-xpls release
+        run: scripts/bump-vibe-xpls-release.sh "$VERSION"
+
+      - name: Capture release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$ARTIFACT_DIR"
+          gh api "repos/io41/vibe-xpls/releases/tags/${VERSION}" \
+            --jq '.assets[] | [.name, (.digest // "")] | @tsv' \
+            > "$ARTIFACT_DIR/release-assets.tsv"
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Build extension
+        run: cargo build --target wasm32-wasip2
+
+      - name: Capture source diff
+        run: |
+          set -euo pipefail
+          git diff -- src/resolver.rs > "$ARTIFACT_DIR/source.diff"
+          test -s "$ARTIFACT_DIR/source.diff"
+
+      - name: Upload audit artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibe-xpls-bump-${{ inputs.version }}
+          path: ${{ runner.temp }}/vibe-xpls-bump/
+          if-no-files-found: error
+
+      - name: Commit bump
+        run: |
+          set -euo pipefail
+          git config user.name "Tim Kersten"
+          git config user.email "tim@io41.com"
+          git switch -c "$BRANCH"
+          git add src/resolver.rs
+          git commit -m "feat(vibe-xpls): bump pinned server to ${VERSION}"
+          git push --set-upstream origin "$BRANCH"
+
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          body="$ARTIFACT_DIR/pr-body.md"
+          {
+            printf 'Updates the pinned vibe-xpls language-server release to `%s`.\n\n' "$VERSION"
+            printf 'Validation run by this workflow:\n'
+            printf '- `cargo fmt --check`\n'
+            printf '- `cargo test`\n'
+            printf '- `cargo build --target wasm32-wasip2`\n\n'
+            printf 'Audit artifacts include `checksums.txt`, release asset metadata, and the source diff.\n'
+          } > "$body"
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "feat(vibe-xpls): bump pinned server to ${VERSION}" \
+            --body-file "$body"
