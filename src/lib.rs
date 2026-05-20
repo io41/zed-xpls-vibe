@@ -410,30 +410,30 @@ mod tests {
 
     #[test]
     fn pins_vibe_xpls_release() {
-        assert_eq!(VIBE_XPLS_VERSION, "v0.0.1");
+        assert_eq!(VIBE_XPLS_VERSION, "v0.0.2");
         assert_eq!(VIBE_XPLS_BIN, "vibe-xpls");
     }
 
     #[test]
     fn download_error_sanitizes_github_json() {
         let message = friendly_download_error(
-            "vibe-xpls_v0.0.1_darwin_arm64.tar.gz",
+            "vibe-xpls_v0.0.2_darwin_arm64.tar.gz",
             "status error 403, response: \"{\\\"message\\\":\\\"API rate limit exceeded\\\"}\"",
         );
 
-        assert!(message.contains("Could not download vibe-xpls v0.0.1 for zed-xpls-vibe."));
+        assert!(message.contains("Could not download vibe-xpls v0.0.2 for zed-xpls-vibe."));
         assert!(message.contains("GitHub refused the download"));
-        assert!(message.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1"));
+        assert!(message.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2"));
         assert!(!message.contains("{\\\"message\\\""));
     }
 
     #[test]
     fn download_error_names_missing_asset() {
         let message =
-            friendly_download_error("vibe-xpls_v0.0.1_linux_amd64.tar.gz", "status error 404");
+            friendly_download_error("vibe-xpls_v0.0.2_linux_amd64.tar.gz", "status error 404");
 
         assert!(message.contains("pinned release asset was not found"));
-        assert!(message.contains("vibe-xpls_v0.0.1_linux_amd64.tar.gz"));
+        assert!(message.contains("vibe-xpls_v0.0.2_linux_amd64.tar.gz"));
     }
 
     #[test]
@@ -520,7 +520,7 @@ mod tests {
             probed.push(candidate.to_string());
             if candidate == "/custom/bin/vibe-xpls" {
                 VersionProbeResult::Output {
-                    stdout: "vibe-xpls v0.0.1\n".to_string(),
+                    stdout: "vibe-xpls v0.0.2\n".to_string(),
                     stderr: String::new(),
                 }
             } else {
@@ -552,7 +552,7 @@ mod tests {
                 VersionProbeResult::Failed("permission denied".to_string())
             } else if candidate == "/custom/bin/vibe-xpls" {
                 VersionProbeResult::Output {
-                    stdout: "vibe-xpls v0.0.1\n".to_string(),
+                    stdout: "vibe-xpls v0.0.2\n".to_string(),
                     stderr: String::new(),
                 }
             } else {
@@ -579,7 +579,7 @@ mod tests {
             probed.push(candidate.to_string());
             if candidate == r"C:\custom\bin\vibe-xpls.exe" {
                 VersionProbeResult::Output {
-                    stdout: "vibe-xpls v0.0.1\n".to_string(),
+                    stdout: "vibe-xpls v0.0.2\n".to_string(),
                     stderr: String::new(),
                 }
             } else {

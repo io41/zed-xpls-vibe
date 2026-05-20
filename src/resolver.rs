@@ -1,4 +1,4 @@
-pub const VIBE_XPLS_VERSION: &str = "v0.0.1";
+pub const VIBE_XPLS_VERSION: &str = "v0.0.2";
 pub const VIBE_XPLS_REPO: &str = "io41/vibe-xpls";
 pub const VIBE_XPLS_BIN: &str = "vibe-xpls";
 pub const VIBE_XPLS_WINDOWS_BIN: &str = "vibe-xpls.exe";
@@ -94,7 +94,7 @@ mod tests {
     impl FakeLookup {
         fn matching_version() -> VersionProbeResult {
             VersionProbeResult::Output {
-                stdout: "vibe-xpls v0.0.1\n".to_string(),
+                stdout: "vibe-xpls v0.0.2\n".to_string(),
                 stderr: String::new(),
             }
         }
@@ -129,16 +129,16 @@ mod tests {
     #[test]
     fn version_output_accepts_exact_pinned_version() {
         assert_eq!(
-            parse_vibe_xpls_version("vibe-xpls v0.0.1\n").unwrap(),
+            parse_vibe_xpls_version("vibe-xpls v0.0.2\n").unwrap(),
             VIBE_XPLS_VERSION
         );
     }
 
     #[test]
     fn version_output_rejects_extra_tokens_and_build_metadata() {
-        assert!(parse_vibe_xpls_version("vibe-xpls v0.0.1 extra").is_err());
-        assert!(parse_vibe_xpls_version("vibe-xpls v0.0.1+dev").is_err());
-        assert!(parse_vibe_xpls_version("prefix vibe-xpls v0.0.1").is_err());
+        assert!(parse_vibe_xpls_version("vibe-xpls v0.0.2 extra").is_err());
+        assert!(parse_vibe_xpls_version("vibe-xpls v0.0.2+dev").is_err());
+        assert!(parse_vibe_xpls_version("prefix vibe-xpls v0.0.2").is_err());
     }
 
     #[test]
@@ -383,39 +383,39 @@ mod tests {
     }
 
     #[test]
-    fn asset_plan_matches_v0_0_1_release_names() {
+    fn asset_plan_matches_v0_0_2_release_names() {
         let plan = download_plan(HostOs::Mac, HostArch::Aarch64).unwrap();
-        assert_eq!(plan.asset_name, "vibe-xpls_v0.0.1_darwin_arm64.tar.gz");
+        assert_eq!(plan.asset_name, "vibe-xpls_v0.0.2_darwin_arm64.tar.gz");
         assert_eq!(
             plan.download_url,
-            "https://github.com/io41/vibe-xpls/releases/download/v0.0.1/vibe-xpls_v0.0.1_darwin_arm64.tar.gz"
+            "https://github.com/io41/vibe-xpls/releases/download/v0.0.2/vibe-xpls_v0.0.2_darwin_arm64.tar.gz"
         );
-        assert_eq!(plan.version_dir, "vibe-xpls-v0.0.1");
-        assert_eq!(plan.temp_dir, "vibe-xpls-v0.0.1.tmp");
-        assert_eq!(plan.binary_path, "vibe-xpls-v0.0.1/vibe-xpls");
-        assert_eq!(plan.temp_binary_path, "vibe-xpls-v0.0.1.tmp/vibe-xpls");
+        assert_eq!(plan.version_dir, "vibe-xpls-v0.0.2");
+        assert_eq!(plan.temp_dir, "vibe-xpls-v0.0.2.tmp");
+        assert_eq!(plan.binary_path, "vibe-xpls-v0.0.2/vibe-xpls");
+        assert_eq!(plan.temp_binary_path, "vibe-xpls-v0.0.2.tmp/vibe-xpls");
         assert_eq!(plan.archive_kind, ArchiveKind::GzipTar);
     }
 
     #[test]
     fn windows_asset_uses_zip_and_exe() {
         let plan = download_plan(HostOs::Windows, HostArch::X8664).unwrap();
-        assert_eq!(plan.asset_name, "vibe-xpls_v0.0.1_windows_amd64.zip");
+        assert_eq!(plan.asset_name, "vibe-xpls_v0.0.2_windows_amd64.zip");
         assert_eq!(
             plan.download_url,
-            "https://github.com/io41/vibe-xpls/releases/download/v0.0.1/vibe-xpls_v0.0.1_windows_amd64.zip"
+            "https://github.com/io41/vibe-xpls/releases/download/v0.0.2/vibe-xpls_v0.0.2_windows_amd64.zip"
         );
-        assert_eq!(plan.binary_path, "vibe-xpls-v0.0.1/vibe-xpls.exe");
+        assert_eq!(plan.binary_path, "vibe-xpls-v0.0.2/vibe-xpls.exe");
         assert_eq!(plan.archive_kind, ArchiveKind::Zip);
     }
 
     #[test]
     fn linux_asset_uses_direct_pinned_url() {
         let plan = download_plan(HostOs::Linux, HostArch::X8664).unwrap();
-        assert_eq!(plan.asset_name, "vibe-xpls_v0.0.1_linux_amd64.tar.gz");
+        assert_eq!(plan.asset_name, "vibe-xpls_v0.0.2_linux_amd64.tar.gz");
         assert_eq!(
             plan.download_url,
-            "https://github.com/io41/vibe-xpls/releases/download/v0.0.1/vibe-xpls_v0.0.1_linux_amd64.tar.gz"
+            "https://github.com/io41/vibe-xpls/releases/download/v0.0.2/vibe-xpls_v0.0.2_linux_amd64.tar.gz"
         );
     }
 
@@ -450,7 +450,7 @@ mod tests {
             .insert("HOME".to_string(), "/home/tim".to_string());
         lookup.probes.insert(
             "/path/vibe-xpls".to_string(),
-            FakeLookup::mismatched_version("v0.0.2"),
+            FakeLookup::mismatched_version("v0.0.3"),
         );
         lookup.probes.insert(
             "/home/tim/go/bin/vibe-xpls".to_string(),
@@ -459,8 +459,8 @@ mod tests {
 
         let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
 
-        assert!(error.contains("Found vibe-xpls v0.0.2 at /path/vibe-xpls"));
-        assert!(error.contains("requires vibe-xpls v0.0.1"));
+        assert!(error.contains("Found vibe-xpls v0.0.3 at /path/vibe-xpls"));
+        assert!(error.contains("requires vibe-xpls v0.0.2"));
         assert_eq!(lookup.probed, vec!["/path/vibe-xpls".to_string()]);
     }
 
@@ -495,13 +495,13 @@ mod tests {
         lookup.env.insert("GOBIN".to_string(), "/gobin".to_string());
         lookup.probes.insert(
             "/gobin/vibe-xpls".to_string(),
-            FakeLookup::mismatched_version("v0.0.2"),
+            FakeLookup::mismatched_version("v0.0.3"),
         );
 
         let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
 
-        assert!(error.contains("Found vibe-xpls v0.0.2 at /gobin/vibe-xpls"));
-        assert!(error.contains("requires vibe-xpls v0.0.1"));
+        assert!(error.contains("Found vibe-xpls v0.0.3 at /gobin/vibe-xpls"));
+        assert!(error.contains("requires vibe-xpls v0.0.2"));
     }
 
     #[test]
@@ -519,7 +519,7 @@ mod tests {
         let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
 
         assert!(error.contains("Could not verify vibe-xpls at /gobin/vibe-xpls"));
-        assert!(error.contains("expected `vibe-xpls v0.0.1`"));
+        assert!(error.contains("expected `vibe-xpls v0.0.2`"));
     }
 
     #[test]
@@ -558,7 +558,7 @@ mod tests {
     fn x86_is_unsupported() {
         let error = download_plan(HostOs::Linux, HostArch::X86).unwrap_err();
         assert!(error.contains("unsupported architecture"));
-        assert!(error.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1"));
+        assert!(error.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2"));
     }
 }
 

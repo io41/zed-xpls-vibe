@@ -12,7 +12,7 @@ With network access on a supported release platform, the extension downloads the
 Optionally install the pinned language server with Go for offline use or to control the local binary:
 
 ```sh
-go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1
+go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2
 ```
 
 Confirm the binary:
@@ -24,7 +24,7 @@ vibe-xpls --version
 Expected version:
 
 ```text
-vibe-xpls v0.0.1
+vibe-xpls v0.0.2
 ```
 
 ## Binary Resolution
@@ -36,12 +36,12 @@ It resolves the binary in this order:
 1. `lsp.zed-xpls-vibe.binary.path`, when configured.
 2. `vibe-xpls` on the worktree shell `PATH`.
 3. Standard Go bin directories: `GOBIN`, `GOPATH/bin`, and `HOME/go/bin` (`USERPROFILE/go/bin` on Windows).
-4. The pinned GitHub release `io41/vibe-xpls@v0.0.1`, downloaded directly on supported release platforms.
+4. The pinned GitHub release `io41/vibe-xpls@v0.0.2`, downloaded directly on supported release platforms.
 
 No settings are needed when `vibe-xpls` is on `PATH` or installed in a standard Go bin directory and reports the pinned version:
 
 ```text
-vibe-xpls v0.0.1
+vibe-xpls v0.0.2
 ```
 
 If an auto-discovered local binary reports any other version, the extension stops with a compatibility error instead of silently running it or falling through to another source.
@@ -148,7 +148,7 @@ vibe-xpls --version
 If the pinned release download fails, install the pinned language server locally and restart Zed:
 
 ```sh
-go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1
+go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2
 ```
 
 If Zed reports an incompatible auto-discovered local `vibe-xpls` version, update or remove the binary path named in the error. The resolver checks `PATH` before standard Go bin directories and stops on a version mismatch, so installing the pinned Go binary will not help if another `vibe-xpls` earlier on `PATH` still wins.
@@ -156,14 +156,14 @@ If Zed reports an incompatible auto-discovered local `vibe-xpls` version, update
 Install the pinned language server:
 
 ```sh
-go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1
+go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2
 vibe-xpls --version
 ```
 
 The expected output is:
 
 ```text
-vibe-xpls v0.0.1
+vibe-xpls v0.0.2
 ```
 
 If another `PATH` entry keeps winning, configure `lsp.zed-xpls-vibe.binary.path` to the pinned binary you want Zed to run.
