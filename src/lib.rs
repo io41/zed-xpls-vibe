@@ -1,3 +1,4 @@
+mod archive;
 mod resolver;
 
 use std::{collections::BTreeMap, fs};
