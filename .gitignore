@@ -2,3 +2,4 @@
 **/*.wasm
 grammars/
 .DS_Store
+.tmp/
