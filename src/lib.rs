@@ -4,8 +4,8 @@ use std::{collections::BTreeMap, fs};
 
 use resolver::{
     default_args, download_plan, manual_install_hint, resolve_local_binary, ArchiveKind,
-    BinarySettings, HostArch, HostOs, LocalLookup, VIBE_XPLS_BIN, VIBE_XPLS_REPO,
-    VIBE_XPLS_VERSION,
+    BinarySettings, HostArch, HostOs, LocalLookup, VersionProbeResult, VIBE_XPLS_BIN,
+    VIBE_XPLS_REPO, VIBE_XPLS_VERSION,
 };
 use zed::settings::LspSettings;
 use zed_extension_api::{self as zed, Result};
@@ -59,9 +59,7 @@ impl LocalLookup for ZedLookup<'_> {
     fn which(&mut self, binary: &str) -> Option<String> {
         if self.path_overridden {
             let shell_env = self.shell_env.clone();
-            return which_on_env_path(binary, &shell_env, self.os, |path| {
-                self.probe_executable(path)
-            });
+            return which_on_env_path(binary, &shell_env, self.os, |path| self.probe_version(path));
         }
 
         self.worktree.which(binary)
@@ -73,12 +71,41 @@ impl LocalLookup for ZedLookup<'_> {
         })
     }
 
-    fn probe_executable(&mut self, path: &str) -> bool {
-        zed::process::Command::new(path)
+    fn probe_version(&mut self, path: &str) -> VersionProbeResult {
+        match fs::metadata(path) {
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return VersionProbeResult::Missing;
+            }
+            Err(error) => {
+                return VersionProbeResult::Failed(format!(
+                    "could not inspect `{path}` before running `{VIBE_XPLS_BIN} --version`: {error}"
+                ));
+            }
+        }
+
+        match zed::process::Command::new(path)
             .arg("--version")
             .envs(self.shell_env.clone())
             .output()
-            .is_ok_and(|output| output.status == Some(0))
+        {
+            Ok(output) if output.status == Some(0) => VersionProbeResult::Output {
+                stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            },
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+                let message = if stderr.trim().is_empty() {
+                    format!("`{path} --version` exited with status {:?}", output.status)
+                } else {
+                    stderr
+                };
+                VersionProbeResult::Failed(message)
+            }
+            Err(error) => {
+                VersionProbeResult::Failed(format!("could not run `{path} --version`: {error}"))
+            }
+        }
     }
 }
 
@@ -141,7 +168,7 @@ fn which_on_env_path(
     binary: &str,
     env: &[(String, String)],
     os: HostOs,
-    mut probe: impl FnMut(&str) -> bool,
+    mut probe: impl FnMut(&str) -> VersionProbeResult,
 ) -> Option<String> {
     let path = env
         .iter()
@@ -149,7 +176,7 @@ fn which_on_env_path(
 
     for dir in path.split(path_separator(os)).filter(|dir| !dir.is_empty()) {
         let candidate = join_host_path(os, dir, binary);
-        if probe(&candidate) {
+        if !matches!(probe(&candidate), VersionProbeResult::Missing) {
             return Some(candidate);
         }
     }
@@ -325,7 +352,7 @@ impl zed::Extension for ZedXplsVibeExtension {
         let env = merged_env(os, worktree.shell_env(), settings.as_ref());
         let mut lookup = ZedLookup::new(worktree, env.clone(), os, path_overridden);
         if let Some(binary) =
-            resolve_local_binary(resolver_binary_settings(settings.as_ref()), os, &mut lookup)
+            resolve_local_binary(resolver_binary_settings(settings.as_ref()), os, &mut lookup)?
         {
             return Ok(zed::Command {
                 command: binary.path,
@@ -447,7 +474,14 @@ mod tests {
 
         let found = which_on_env_path("vibe-xpls", &env, HostOs::Linux, |candidate| {
             probed.push(candidate.to_string());
-            candidate == "/custom/bin/vibe-xpls"
+            if candidate == "/custom/bin/vibe-xpls" {
+                VersionProbeResult::Output {
+                    stdout: "vibe-xpls v0.0.1\n".to_string(),
+                    stderr: String::new(),
+                }
+            } else {
+                VersionProbeResult::Missing
+            }
         });
 
         assert_eq!(found, Some("/custom/bin/vibe-xpls".to_string()));
@@ -461,13 +495,52 @@ mod tests {
     }
 
     #[test]
+    fn path_override_lookup_selects_failed_existing_candidate() {
+        let env = vec![(
+            "PATH".to_string(),
+            "/missing:/broken:/custom/bin".to_string(),
+        )];
+        let mut probed = Vec::new();
+
+        let found = which_on_env_path("vibe-xpls", &env, HostOs::Linux, |candidate| {
+            probed.push(candidate.to_string());
+            if candidate == "/broken/vibe-xpls" {
+                VersionProbeResult::Failed("permission denied".to_string())
+            } else if candidate == "/custom/bin/vibe-xpls" {
+                VersionProbeResult::Output {
+                    stdout: "vibe-xpls v0.0.1\n".to_string(),
+                    stderr: String::new(),
+                }
+            } else {
+                VersionProbeResult::Missing
+            }
+        });
+
+        assert_eq!(found, Some("/broken/vibe-xpls".to_string()));
+        assert_eq!(
+            probed,
+            vec![
+                "/missing/vibe-xpls".to_string(),
+                "/broken/vibe-xpls".to_string(),
+            ]
+        );
+    }
+
+    #[test]
     fn windows_path_override_lookup_accepts_path_key_casing() {
         let env = vec![("Path".to_string(), r"C:\custom\bin".to_string())];
         let mut probed = Vec::new();
 
         let found = which_on_env_path("vibe-xpls.exe", &env, HostOs::Windows, |candidate| {
             probed.push(candidate.to_string());
-            candidate == r"C:\custom\bin\vibe-xpls.exe"
+            if candidate == r"C:\custom\bin\vibe-xpls.exe" {
+                VersionProbeResult::Output {
+                    stdout: "vibe-xpls v0.0.1\n".to_string(),
+                    stderr: String::new(),
+                }
+            } else {
+                VersionProbeResult::Missing
+            }
         });
 
         assert_eq!(found, Some(r"C:\custom\bin\vibe-xpls.exe".to_string()));

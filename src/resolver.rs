@@ -26,6 +26,7 @@ pub enum ArchiveKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DownloadPlan {
     pub asset_name: String,
+    pub download_url: String,
     pub version_dir: String,
     pub temp_dir: String,
     pub binary_path: String,
@@ -53,10 +54,17 @@ pub struct LocalBinary {
     pub source: LocalBinarySource,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VersionProbeResult {
+    Missing,
+    Failed(String),
+    Output { stdout: String, stderr: String },
+}
+
 pub trait LocalLookup {
     fn which(&mut self, binary: &str) -> Option<String>;
     fn env_var(&self, key: &str) -> Option<String>;
-    fn probe_executable(&mut self, path: &str) -> bool;
+    fn probe_version(&mut self, path: &str) -> VersionProbeResult;
 }
 
 #[cfg(test)]
@@ -67,7 +75,7 @@ mod tests {
         which_path: Option<String>,
         which_calls: Vec<String>,
         env: std::collections::BTreeMap<String, String>,
-        probeable: std::collections::BTreeSet<String>,
+        probes: std::collections::BTreeMap<String, VersionProbeResult>,
         probed: Vec<String>,
     }
 
@@ -77,8 +85,24 @@ mod tests {
                 which_path: None,
                 which_calls: Vec::new(),
                 env: std::collections::BTreeMap::new(),
-                probeable: std::collections::BTreeSet::new(),
+                probes: std::collections::BTreeMap::new(),
                 probed: Vec::new(),
+            }
+        }
+    }
+
+    impl FakeLookup {
+        fn matching_version() -> VersionProbeResult {
+            VersionProbeResult::Output {
+                stdout: "vibe-xpls v0.0.1\n".to_string(),
+                stderr: String::new(),
+            }
+        }
+
+        fn mismatched_version(version: &str) -> VersionProbeResult {
+            VersionProbeResult::Output {
+                stdout: format!("vibe-xpls {version}\n"),
+                stderr: String::new(),
             }
         }
     }
@@ -93,10 +117,28 @@ mod tests {
             self.env.get(key).cloned()
         }
 
-        fn probe_executable(&mut self, path: &str) -> bool {
+        fn probe_version(&mut self, path: &str) -> VersionProbeResult {
             self.probed.push(path.to_string());
-            self.probeable.contains(path)
+            self.probes
+                .get(path)
+                .cloned()
+                .unwrap_or(VersionProbeResult::Missing)
         }
+    }
+
+    #[test]
+    fn version_output_accepts_exact_pinned_version() {
+        assert_eq!(
+            parse_vibe_xpls_version("vibe-xpls v0.0.1\n").unwrap(),
+            VIBE_XPLS_VERSION
+        );
+    }
+
+    #[test]
+    fn version_output_rejects_extra_tokens_and_build_metadata() {
+        assert!(parse_vibe_xpls_version("vibe-xpls v0.0.1 extra").is_err());
+        assert!(parse_vibe_xpls_version("vibe-xpls v0.0.1+dev").is_err());
+        assert!(parse_vibe_xpls_version("prefix vibe-xpls v0.0.1").is_err());
     }
 
     #[test]
@@ -115,7 +157,9 @@ mod tests {
             ..FakeLookup::default()
         };
 
-        let binary = resolve_local_binary(Some(settings), HostOs::Mac, &mut lookup).unwrap();
+        let binary = resolve_local_binary(Some(settings), HostOs::Mac, &mut lookup)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(binary.path, "/custom/vibe-xpls");
         assert_eq!(binary.args, vec!["serve".to_string()]);
@@ -130,7 +174,9 @@ mod tests {
         };
         let mut lookup = FakeLookup::default();
 
-        let binary = resolve_local_binary(Some(settings), HostOs::Mac, &mut lookup).unwrap();
+        let binary = resolve_local_binary(Some(settings), HostOs::Mac, &mut lookup)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(
             binary.args,
@@ -149,7 +195,14 @@ mod tests {
             ..FakeLookup::default()
         };
 
-        let binary = resolve_local_binary(Some(settings), HostOs::Mac, &mut lookup).unwrap();
+        lookup.probes.insert(
+            "/path/vibe-xpls".to_string(),
+            FakeLookup::matching_version(),
+        );
+
+        let binary = resolve_local_binary(Some(settings), HostOs::Mac, &mut lookup)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(binary.path, "/path/vibe-xpls");
         assert_eq!(
@@ -170,7 +223,14 @@ mod tests {
             ..FakeLookup::default()
         };
 
-        let binary = resolve_local_binary(Some(settings), HostOs::Mac, &mut lookup).unwrap();
+        lookup.probes.insert(
+            "/path/vibe-xpls".to_string(),
+            FakeLookup::matching_version(),
+        );
+
+        let binary = resolve_local_binary(Some(settings), HostOs::Mac, &mut lookup)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(binary.path, "/path/vibe-xpls");
         assert_eq!(
@@ -189,16 +249,23 @@ mod tests {
         lookup
             .env
             .insert("HOME".to_string(), "/home/tim".to_string());
-        lookup
-            .probeable
-            .insert("/home/tim/go/bin/vibe-xpls".to_string());
+        lookup.probes.insert(
+            "/path/vibe-xpls".to_string(),
+            FakeLookup::matching_version(),
+        );
+        lookup.probes.insert(
+            "/home/tim/go/bin/vibe-xpls".to_string(),
+            FakeLookup::matching_version(),
+        );
 
-        let binary = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap();
+        let binary = resolve_local_binary(None, HostOs::Mac, &mut lookup)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(binary.path, "/path/vibe-xpls");
         assert_eq!(binary.source, LocalBinarySource::Path);
         assert_eq!(lookup.which_calls, vec!["vibe-xpls".to_string()]);
-        assert!(lookup.probed.is_empty());
+        assert_eq!(lookup.probed, vec!["/path/vibe-xpls".to_string()]);
     }
 
     #[test]
@@ -211,9 +278,14 @@ mod tests {
         lookup
             .env
             .insert("HOME".to_string(), "/home/tim".to_string());
-        lookup.probeable.insert("/gopath/bin/vibe-xpls".to_string());
+        lookup.probes.insert(
+            "/gopath/bin/vibe-xpls".to_string(),
+            FakeLookup::matching_version(),
+        );
 
-        let binary = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap();
+        let binary = resolve_local_binary(None, HostOs::Mac, &mut lookup)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(binary.path, "/gopath/bin/vibe-xpls");
         assert_eq!(
@@ -235,9 +307,14 @@ mod tests {
         lookup
             .env
             .insert("GOPATH".to_string(), "/first:/second".to_string());
-        lookup.probeable.insert("/first/bin/vibe-xpls".to_string());
+        lookup.probes.insert(
+            "/first/bin/vibe-xpls".to_string(),
+            FakeLookup::matching_version(),
+        );
 
-        let binary = resolve_local_binary(None, HostOs::Linux, &mut lookup).unwrap();
+        let binary = resolve_local_binary(None, HostOs::Linux, &mut lookup)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(binary.path, "/first/bin/vibe-xpls");
         assert_eq!(lookup.probed, vec!["/first/bin/vibe-xpls".to_string()]);
@@ -255,11 +332,14 @@ mod tests {
         lookup
             .env
             .insert("HOME".to_string(), r"C:\Users\tim".to_string());
-        lookup
-            .probeable
-            .insert(r"D:\GoPath\bin\vibe-xpls.exe".to_string());
+        lookup.probes.insert(
+            r"D:\GoPath\bin\vibe-xpls.exe".to_string(),
+            FakeLookup::matching_version(),
+        );
 
-        let binary = resolve_local_binary(None, HostOs::Windows, &mut lookup).unwrap();
+        let binary = resolve_local_binary(None, HostOs::Windows, &mut lookup)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(lookup.which_calls, vec!["vibe-xpls.exe".to_string()]);
         assert_eq!(binary.path, r"D:\GoPath\bin\vibe-xpls.exe");
@@ -282,11 +362,14 @@ mod tests {
         lookup
             .env
             .insert("USERPROFILE".to_string(), r"C:\Users\tim".to_string());
-        lookup
-            .probeable
-            .insert(r"C:\Users\tim\go\bin\vibe-xpls.exe".to_string());
+        lookup.probes.insert(
+            r"C:\Users\tim\go\bin\vibe-xpls.exe".to_string(),
+            FakeLookup::matching_version(),
+        );
 
-        let binary = resolve_local_binary(None, HostOs::Windows, &mut lookup).unwrap();
+        let binary = resolve_local_binary(None, HostOs::Windows, &mut lookup)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(binary.path, r"C:\Users\tim\go\bin\vibe-xpls.exe");
         assert_eq!(
@@ -303,6 +386,10 @@ mod tests {
     fn asset_plan_matches_v0_0_1_release_names() {
         let plan = download_plan(HostOs::Mac, HostArch::Aarch64).unwrap();
         assert_eq!(plan.asset_name, "vibe-xpls_v0.0.1_darwin_arm64.tar.gz");
+        assert_eq!(
+            plan.download_url,
+            "https://github.com/io41/vibe-xpls/releases/download/v0.0.1/vibe-xpls_v0.0.1_darwin_arm64.tar.gz"
+        );
         assert_eq!(plan.version_dir, "vibe-xpls-v0.0.1");
         assert_eq!(plan.temp_dir, "vibe-xpls-v0.0.1.tmp");
         assert_eq!(plan.binary_path, "vibe-xpls-v0.0.1/vibe-xpls");
@@ -314,8 +401,157 @@ mod tests {
     fn windows_asset_uses_zip_and_exe() {
         let plan = download_plan(HostOs::Windows, HostArch::X8664).unwrap();
         assert_eq!(plan.asset_name, "vibe-xpls_v0.0.1_windows_amd64.zip");
+        assert_eq!(
+            plan.download_url,
+            "https://github.com/io41/vibe-xpls/releases/download/v0.0.1/vibe-xpls_v0.0.1_windows_amd64.zip"
+        );
         assert_eq!(plan.binary_path, "vibe-xpls-v0.0.1/vibe-xpls.exe");
         assert_eq!(plan.archive_kind, ArchiveKind::Zip);
+    }
+
+    #[test]
+    fn linux_asset_uses_direct_pinned_url() {
+        let plan = download_plan(HostOs::Linux, HostArch::X8664).unwrap();
+        assert_eq!(plan.asset_name, "vibe-xpls_v0.0.1_linux_amd64.tar.gz");
+        assert_eq!(
+            plan.download_url,
+            "https://github.com/io41/vibe-xpls/releases/download/v0.0.1/vibe-xpls_v0.0.1_linux_amd64.tar.gz"
+        );
+    }
+
+    #[test]
+    fn path_lookup_requires_matching_version() {
+        let mut lookup = FakeLookup {
+            which_path: Some("/path/vibe-xpls".to_string()),
+            ..FakeLookup::default()
+        };
+        lookup.probes.insert(
+            "/path/vibe-xpls".to_string(),
+            FakeLookup::matching_version(),
+        );
+
+        let binary = resolve_local_binary(None, HostOs::Mac, &mut lookup)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(binary.path, "/path/vibe-xpls");
+        assert_eq!(binary.source, LocalBinarySource::Path);
+        assert_eq!(lookup.probed, vec!["/path/vibe-xpls".to_string()]);
+    }
+
+    #[test]
+    fn path_lookup_mismatch_hard_fails_before_go_bin() {
+        let mut lookup = FakeLookup {
+            which_path: Some("/path/vibe-xpls".to_string()),
+            ..FakeLookup::default()
+        };
+        lookup
+            .env
+            .insert("HOME".to_string(), "/home/tim".to_string());
+        lookup.probes.insert(
+            "/path/vibe-xpls".to_string(),
+            FakeLookup::mismatched_version("v0.0.2"),
+        );
+        lookup.probes.insert(
+            "/home/tim/go/bin/vibe-xpls".to_string(),
+            FakeLookup::matching_version(),
+        );
+
+        let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
+
+        assert!(error.contains("Found vibe-xpls v0.0.2 at /path/vibe-xpls"));
+        assert!(error.contains("requires vibe-xpls v0.0.1"));
+        assert_eq!(lookup.probed, vec!["/path/vibe-xpls".to_string()]);
+    }
+
+    #[test]
+    fn path_lookup_failed_probe_hard_fails_before_go_bin() {
+        let mut lookup = FakeLookup {
+            which_path: Some("/path/vibe-xpls".to_string()),
+            ..FakeLookup::default()
+        };
+        lookup
+            .env
+            .insert("HOME".to_string(), "/home/tim".to_string());
+        lookup.probes.insert(
+            "/path/vibe-xpls".to_string(),
+            VersionProbeResult::Failed("permission denied".to_string()),
+        );
+        lookup.probes.insert(
+            "/home/tim/go/bin/vibe-xpls".to_string(),
+            FakeLookup::matching_version(),
+        );
+
+        let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
+
+        assert!(error.contains("Could not verify vibe-xpls at /path/vibe-xpls"));
+        assert!(error.contains("permission denied"));
+        assert_eq!(lookup.probed, vec!["/path/vibe-xpls".to_string()]);
+    }
+
+    #[test]
+    fn go_bin_mismatch_hard_fails() {
+        let mut lookup = FakeLookup::default();
+        lookup.env.insert("GOBIN".to_string(), "/gobin".to_string());
+        lookup.probes.insert(
+            "/gobin/vibe-xpls".to_string(),
+            FakeLookup::mismatched_version("v0.0.2"),
+        );
+
+        let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
+
+        assert!(error.contains("Found vibe-xpls v0.0.2 at /gobin/vibe-xpls"));
+        assert!(error.contains("requires vibe-xpls v0.0.1"));
+    }
+
+    #[test]
+    fn go_bin_unparseable_version_errors() {
+        let mut lookup = FakeLookup::default();
+        lookup.env.insert("GOBIN".to_string(), "/gobin".to_string());
+        lookup.probes.insert(
+            "/gobin/vibe-xpls".to_string(),
+            VersionProbeResult::Output {
+                stdout: "unexpected output\n".to_string(),
+                stderr: String::new(),
+            },
+        );
+
+        let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
+
+        assert!(error.contains("Could not verify vibe-xpls at /gobin/vibe-xpls"));
+        assert!(error.contains("expected `vibe-xpls v0.0.1`"));
+    }
+
+    #[test]
+    fn failed_version_probe_errors() {
+        let mut lookup = FakeLookup::default();
+        lookup.env.insert("GOBIN".to_string(), "/gobin".to_string());
+        lookup.probes.insert(
+            "/gobin/vibe-xpls".to_string(),
+            VersionProbeResult::Failed("permission denied".to_string()),
+        );
+
+        let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
+
+        assert!(error.contains("Could not verify vibe-xpls at /gobin/vibe-xpls"));
+        assert!(error.contains("permission denied"));
+    }
+
+    #[test]
+    fn user_setting_path_bypasses_version_probe() {
+        let settings = BinarySettings {
+            path: Some("/custom/vibe-xpls".to_string()),
+            arguments: None,
+        };
+        let mut lookup = FakeLookup::default();
+
+        let binary = resolve_local_binary(Some(settings), HostOs::Mac, &mut lookup)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(binary.path, "/custom/vibe-xpls");
+        assert_eq!(binary.source, LocalBinarySource::UserSetting);
+        assert!(lookup.probed.is_empty());
     }
 
     #[test]
@@ -334,11 +570,72 @@ pub fn manual_install_hint() -> String {
     format!("go install github.com/{VIBE_XPLS_REPO}/cmd/vibe-xpls@{VIBE_XPLS_VERSION}")
 }
 
+pub fn release_asset_url(asset_name: &str) -> String {
+    format!(
+        "https://github.com/{VIBE_XPLS_REPO}/releases/download/{VIBE_XPLS_VERSION}/{asset_name}"
+    )
+}
+
+pub fn parse_vibe_xpls_version(stdout: &str) -> Result<&str, String> {
+    let output = stdout.trim();
+    let expected = format!("{VIBE_XPLS_BIN} {VIBE_XPLS_VERSION}");
+
+    if output == expected {
+        Ok(VIBE_XPLS_VERSION)
+    } else {
+        Err(format!(
+            "expected `{expected}` from `{VIBE_XPLS_BIN} --version`, got `{output}`"
+        ))
+    }
+}
+
+fn local_binary_error(path: &str, message: impl AsRef<str>) -> String {
+    format!(
+        "Could not verify vibe-xpls at {path}. {}\n\nInstall the pinned server with:\n{}\n\nOr configure lsp.zed-xpls-vibe.binary.path if you intentionally want to use a different server version.",
+        message.as_ref(),
+        manual_install_hint()
+    )
+}
+
+fn version_mismatch_error(path: &str, found: &str) -> String {
+    format!(
+        "Found vibe-xpls {found} at {path}, but zed-xpls-vibe requires vibe-xpls {VIBE_XPLS_VERSION}.\n\nInstall the pinned server with:\n{}\n\nOr configure lsp.zed-xpls-vibe.binary.path if you intentionally want to use a different server version.",
+        manual_install_hint()
+    )
+}
+
+fn found_version(stdout: &str) -> Option<&str> {
+    stdout
+        .trim()
+        .strip_prefix("vibe-xpls ")
+        .filter(|version| version.chars().all(|ch| !ch.is_whitespace()))
+}
+
+fn verify_auto_discovered_binary<L: LocalLookup>(
+    path: &str,
+    lookup: &mut L,
+) -> Result<bool, String> {
+    match lookup.probe_version(path) {
+        VersionProbeResult::Missing => Ok(false),
+        VersionProbeResult::Failed(message) => Err(local_binary_error(path, message)),
+        VersionProbeResult::Output { stdout, .. } => match parse_vibe_xpls_version(&stdout) {
+            Ok(_) => Ok(true),
+            Err(message) => {
+                if let Some(version) = found_version(&stdout) {
+                    Err(version_mismatch_error(path, version))
+                } else {
+                    Err(local_binary_error(path, message))
+                }
+            }
+        },
+    }
+}
+
 pub fn resolve_local_binary<L: LocalLookup>(
     settings: Option<BinarySettings>,
     os: HostOs,
     lookup: &mut L,
-) -> Option<LocalBinary> {
+) -> Result<Option<LocalBinary>, String> {
     let (settings_path, args) = settings
         .map(|settings| {
             (
@@ -350,34 +647,40 @@ pub fn resolve_local_binary<L: LocalLookup>(
 
     if let Some(path) = settings_path {
         if !path.trim().is_empty() {
-            return Some(LocalBinary {
+            return Ok(Some(LocalBinary {
                 path,
                 args,
                 source: LocalBinarySource::UserSetting,
-            });
+            }));
         }
     }
 
     let binary_name = host_binary_name(os);
     if let Some(path) = lookup.which(binary_name) {
-        return Some(LocalBinary {
-            path,
-            args: args.clone(),
-            source: LocalBinarySource::Path,
-        });
+        if verify_auto_discovered_binary(&path, lookup)? {
+            return Ok(Some(LocalBinary {
+                path,
+                args: args.clone(),
+                source: LocalBinarySource::Path,
+            }));
+        }
+        return Err(local_binary_error(
+            &path,
+            format!("`{binary_name} --version` could not be executed."),
+        ));
     }
 
     for (source, path) in go_bin_candidates(os, binary_name, lookup) {
-        if lookup.probe_executable(&path) {
-            return Some(LocalBinary {
+        if verify_auto_discovered_binary(&path, lookup)? {
+            return Ok(Some(LocalBinary {
                 path,
                 args: args.clone(),
                 source: LocalBinarySource::GoBin(source),
-            });
+            }));
         }
     }
 
-    None
+    Ok(None)
 }
 
 fn host_binary_name(os: HostOs) -> &'static str {
@@ -502,8 +805,12 @@ pub fn download_plan(os: HostOs, arch: HostArch) -> Result<DownloadPlan, String>
     let binary_path = format!("{version_dir}/{binary_name}");
     let temp_binary_path = format!("{temp_dir}/{binary_name}");
 
+    let asset_name = format!("vibe-xpls_{VIBE_XPLS_VERSION}_{os_part}_{arch_part}.{extension}");
+    let download_url = release_asset_url(&asset_name);
+
     Ok(DownloadPlan {
-        asset_name: format!("vibe-xpls_{VIBE_XPLS_VERSION}_{os_part}_{arch_part}.{extension}"),
+        asset_name,
+        download_url,
         version_dir,
         temp_dir,
         binary_path,
