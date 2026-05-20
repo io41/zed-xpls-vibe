@@ -17,7 +17,7 @@
   ],
   "packages": {
     ".": {
-      "package-name": "zed-xpls-vibe",
+      "package-name": "crossplane-yaml",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {

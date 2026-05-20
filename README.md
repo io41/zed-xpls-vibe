@@ -1,4 +1,4 @@
-# Zed xpls Vibe
+# Crossplane YAML
 
 Zed extension for Crossplane package diagnostics and Crossplane YAML highlighting powered by [`vibe-xpls`](https://github.com/io41/vibe-xpls).
 
@@ -33,7 +33,7 @@ The extension starts `vibe-xpls serve`.
 
 It resolves the binary in this order:
 
-1. `lsp.zed-xpls-vibe.binary.path`, when configured.
+1. `lsp.crossplane-yaml.binary.path`, when configured.
 2. `vibe-xpls` on the worktree shell `PATH`.
 3. Standard Go bin directories: `GOBIN`, `GOPATH/bin`, and `HOME/go/bin` (`USERPROFILE/go/bin` on Windows).
 4. The pinned GitHub release `io41/vibe-xpls@v0.0.2`, downloaded directly on supported release platforms.
@@ -51,7 +51,7 @@ Use an explicit path only as an expert override for non-standard installs. Compa
 ```jsonc
 {
   "lsp": {
-    "zed-xpls-vibe": {
+    "crossplane-yaml": {
       "binary": {
         "path": "/absolute/path/to/vibe-xpls",
         "arguments": ["serve"]
@@ -63,7 +63,7 @@ Use an explicit path only as an expert override for non-standard installs. Compa
 
 ## Usage
 
-Install the extension from Zed once it is published, or use `zed: install dev extension` when developing from this repository.
+Install the extension from Zed once it is published, or use `zed: install dev extension` when developing from a local checkout of `https://github.com/io41/crossplane-yaml`.
 
 Open a file classified as `Crossplane YAML`.
 
@@ -79,7 +79,7 @@ The extension keeps Zed's native YAML support enabled for ordinary YAML and adds
 - `definition.yml`
 - files mapped to `Crossplane YAML` with Zed `file_types`, such as `*-composition.yaml` and `*-definition.yaml`
 
-`zed-xpls-vibe` runs for `Crossplane YAML` files and leaves package detection to the `vibe-xpls` language server. This allows root package, nested package, multi-package, and no-root validation to exercise the same analyzer path.
+`crossplane-yaml` runs for `Crossplane YAML` files and leaves package detection to the `vibe-xpls` language server. This allows root package, nested package, multi-package, and no-root validation to exercise the same analyzer path.
 
 `Crossplane YAML` uses two-space, space-only indentation to match YAML and avoid Zed's default four-space indentation in this custom language.
 
@@ -131,11 +131,11 @@ The extension pins the `vibe-xpls` language server release in source. Bumping th
 
 Zed registry publication happens through a PR to [`zed-industries/extensions`](https://github.com/zed-industries/extensions).
 
-The extension must be public, licensed, and added as an HTTPS submodule under `extensions/zed-xpls-vibe` with a matching `extensions.toml` version.
+The extension must be public, licensed, and added as an HTTPS submodule under `extensions/crossplane-yaml` with a matching `extensions.toml` version.
 
 ## Troubleshooting
 
-If Zed does not start this server, first confirm that the original `up-xpls` extension is uninstalled or disabled.
+If Zed does not start this server, first confirm that any conflicting earlier development extension is uninstalled or disabled.
 
 If Zed logs show that the worktree is not trusted, trust the worktree in Zed and reopen it. Zed will not start language servers for untrusted worktrees.
 
@@ -166,7 +166,7 @@ The expected output is:
 vibe-xpls v0.0.2
 ```
 
-If another `PATH` entry keeps winning, configure `lsp.zed-xpls-vibe.binary.path` to the pinned binary you want Zed to run.
+If another `PATH` entry keeps winning, configure `lsp.crossplane-yaml.binary.path` to the pinned binary you want Zed to run.
 
 For extension logs, run Zed with:
 

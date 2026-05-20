@@ -12,11 +12,11 @@ falls back to a pinned `io41/vibe-xpls` GitHub release. A real install hit a
 GitHub REST API rate limit while calling the release API:
 
 ```text
-failed to fetch vibe-xpls v0.0.1: status error 403 ... API rate limit exceeded
+failed to fetch vibe-xpls v0.0.2: status error 403 ... API rate limit exceeded
 ```
 
 That error is too raw for an editor user, and the API call is avoidable. The
-extension already pins `vibe-xpls` to `v0.0.1` and computes the exact platform
+extension already pins `vibe-xpls` to `v0.0.2` and computes the exact platform
 asset name, so it can download the exact release asset URL directly instead of
 querying GitHub release metadata.
 
@@ -26,10 +26,13 @@ the language server binary, but each extension release owns one pinned
 `vibe-xpls` version. Automatic local discovery must not silently run a different
 server version.
 
-This design supersedes the pinned auto-download mechanism in
-`docs/superpowers/specs/2026-05-19-zed-xpls-vibe-public-release-design.md`.
-That earlier design used `zed::github_release_by_tag_name`; this design replaces
-that release metadata lookup with a direct pinned release asset URL.
+The public extension repository is `io41/crossplane-yaml`; the pinned language
+server release remains under `io41/vibe-xpls`.
+
+This design supersedes the pinned auto-download mechanism from the prior
+2026-05-19 public-release design. That earlier design used
+`zed::github_release_by_tag_name`; this design replaces that release metadata
+lookup with a direct pinned release asset URL.
 
 ## Goals
 
@@ -55,13 +58,13 @@ fallback download path. Instead, it should construct the exact browser download
 URL from the existing pinned constants and platform asset plan:
 
 ```text
-https://github.com/io41/vibe-xpls/releases/download/v0.0.1/<asset-name>
+https://github.com/io41/vibe-xpls/releases/download/v0.0.2/<asset-name>
 ```
 
 The asset name remains platform-specific and exact, for example:
 
 ```text
-vibe-xpls_v0.0.1_darwin_arm64.tar.gz
+vibe-xpls_v0.0.2_darwin_arm64.tar.gz
 ```
 
 The extension should pass that URL directly to `zed::download_file`, preserving
@@ -84,7 +87,7 @@ name.
 
 Resolution order remains:
 
-1. `lsp.zed-xpls-vibe.binary.path`, when configured.
+1. `lsp.crossplane-yaml.binary.path`, when configured.
 2. `vibe-xpls` from the merged shell/settings `PATH`.
 3. Standard Go bin directories.
 4. Direct pinned download from the GitHub release asset URL.
@@ -100,7 +103,7 @@ Version enforcement depends on the source:
 - Auto-discovered binaries from `PATH` or Go bin directories must pass a
   `vibe-xpls --version` check before startup.
 - If an auto-discovered local binary reports a version different from
-  `v0.0.1`, startup should stop with a friendly error.
+  `v0.0.2`, startup should stop with a friendly error.
 - If the version command cannot be run or cannot be parsed, startup should stop
   with a friendly error for auto-discovered binaries rather than silently
   falling back or launching an unknown server.
@@ -108,7 +111,7 @@ Version enforcement depends on the source:
   comes from the exact pinned version URL and asset name.
 
 The mismatch policy is hard-fail, not skip-and-continue. If `vibe-xpls` is found
-on PATH and reports `v0.0.2`, the extension must stop instead of falling through
+on PATH and reports `v9.9.9`, the extension must stop instead of falling through
 to a matching Go-bin candidate or the pinned download. If a Go-bin candidate
 exists but reports the wrong version, the extension must stop instead of trying
 later Go-bin candidates. Missing Go-bin candidate files may still be skipped.
@@ -126,16 +129,16 @@ The Zed host adapter should execute `<candidate> --version` and return the
 status plus captured stdout/stderr, but the resolver core should parse and
 compare the output against `VIBE_XPLS_VERSION`.
 
-The expected version output for `v0.0.1` is:
+The expected version output for `v0.0.2` is:
 
 ```text
-vibe-xpls v0.0.1
+vibe-xpls v0.0.2
 ```
 
 The parser should inspect stdout from a successful `--version` command, trim
 surrounding ASCII whitespace, and require the exact string
-`vibe-xpls v0.0.1`. It should not accept loose substrings, build metadata such
-as `vibe-xpls v0.0.1+gitsha`, or extra tokens. Stderr should only be used for a
+`vibe-xpls v0.0.2`. It should not accept loose substrings, build metadata such
+as `vibe-xpls v0.0.2+gitsha`, or extra tokens. Stderr should only be used for a
 short sanitized failure reason when the command exits unsuccessfully or stdout
 cannot be parsed.
 
@@ -151,15 +154,15 @@ Errors should be written for someone seeing a Zed language server popup.
 Network fallback error shape:
 
 ```text
-Could not download vibe-xpls v0.0.1 for zed-xpls-vibe.
+Could not download vibe-xpls v0.0.2 for crossplane-yaml.
 
 The extension downloads a pinned language-server binary when no compatible
 local vibe-xpls is found. The download failed: <short cause>.
 
 Install the pinned server with:
-go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1
+go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2
 
-Or configure lsp.zed-xpls-vibe.binary.path to a compatible local binary.
+Or configure lsp.crossplane-yaml.binary.path to a compatible local binary.
 ```
 
 Download errors should be mapped into a small set of user-facing causes when
@@ -175,13 +178,13 @@ the host error contains enough information:
 Version mismatch error shape:
 
 ```text
-Found vibe-xpls v0.0.2 at <path>, but zed-xpls-vibe 0.0.1 requires
-vibe-xpls v0.0.1.
+Found vibe-xpls v9.9.9 at <path>, but crossplane-yaml 0.0.1 requires
+vibe-xpls v0.0.2.
 
 Install the pinned server with:
-go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1
+go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2
 
-Or configure lsp.zed-xpls-vibe.binary.path if you intentionally want to use a
+Or configure lsp.crossplane-yaml.binary.path if you intentionally want to use a
 different server version.
 ```
 
@@ -198,12 +201,12 @@ README changes should explain:
 - `binary.path` is the intentional escape hatch for non-standard or development
   binaries.
 - If a download fails, `go install
-  github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.1` is the preferred manual
+  github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2` is the preferred manual
   fallback.
 
 `AGENTS.md` should add guardrails for the new policy:
 
-- Preserve the existing extension id, language server id, resolver order, and
+- Preserve the `crossplane-yaml` extension id, language server id, resolver order, and
   default `serve` guardrails.
 - Update the resolver-order guardrail to say PATH and Go-bin results are
   version-checked before use.
