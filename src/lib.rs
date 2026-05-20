@@ -3,10 +3,10 @@ mod resolver;
 
 use std::{collections::BTreeMap, fs};
 
+use archive::{extract_archive, verify_sha256_file, ChecksumMismatch};
 use resolver::{
-    default_args, download_plan, manual_install_hint, resolve_local_binary, ArchiveKind,
-    BinarySettings, HostArch, HostOs, LocalLookup, VersionProbeResult, VIBE_XPLS_BIN,
-    VIBE_XPLS_VERSION,
+    default_args, download_plan, manual_install_hint, resolve_local_binary, BinarySettings,
+    HostArch, HostOs, LocalLookup, VersionProbeResult, VIBE_XPLS_BIN, VIBE_XPLS_VERSION,
 };
 use zed::settings::LspSettings;
 use zed_extension_api::{self as zed, Result};
@@ -244,13 +244,6 @@ fn host_platform() -> Result<(HostOs, HostArch)> {
     Ok((os, arch))
 }
 
-fn zed_archive_kind(kind: ArchiveKind) -> zed::DownloadedFileType {
-    match kind {
-        ArchiveKind::GzipTar => zed::DownloadedFileType::GzipTar,
-        ArchiveKind::Zip => zed::DownloadedFileType::Zip,
-    }
-}
-
 fn sanitize_host_error(error: &str) -> String {
     let before_response = error
         .split("response:")
@@ -284,6 +277,23 @@ fn friendly_download_error(asset_name: &str, error: impl ToString) -> String {
     )
 }
 
+fn friendly_checksum_error(asset_name: &str, mismatch: ChecksumMismatch) -> String {
+    format!(
+        "Could not verify {VIBE_XPLS_BIN} {VIBE_XPLS_VERSION} for {LANGUAGE_SERVER_ID}.\n\nThe extension downloaded pinned release asset `{asset_name}`, but its SHA-256 checksum did not match the value recorded by the extension. Expected `{}`, got `{}`.\n\nInstall the pinned server with:\n{}\n\nOr configure lsp.{LANGUAGE_SERVER_ID}.binary.path to a compatible local binary.",
+        mismatch.expected,
+        mismatch.actual,
+        manual_install_hint()
+    )
+}
+
+fn friendly_extraction_error(asset_name: &str, error: impl ToString) -> String {
+    format!(
+        "Could not extract {VIBE_XPLS_BIN} {VIBE_XPLS_VERSION} for {LANGUAGE_SERVER_ID}.\n\nThe extension downloaded and verified pinned release asset `{asset_name}`, but extraction failed: {}.\n\nInstall the pinned server with:\n{}\n\nOr configure lsp.{LANGUAGE_SERVER_ID}.binary.path to a compatible local binary.",
+        sanitize_host_error(&error.to_string()),
+        manual_install_hint()
+    )
+}
+
 impl CrossplaneYamlExtension {
     fn downloaded_binary_path(
         &mut self,
@@ -308,24 +318,50 @@ impl CrossplaneYamlExtension {
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
         fs::remove_dir_all(&plan.temp_dir).ok();
+        fs::create_dir_all(&plan.temp_dir).map_err(|error| {
+            format!(
+                "failed to create temporary download directory `{}`: {error}",
+                plan.temp_dir
+            )
+        })?;
         zed::set_language_server_installation_status(
             language_server_id,
             &zed::LanguageServerInstallationStatus::Downloading,
         );
         zed::download_file(
             &plan.download_url,
-            &plan.temp_dir,
-            zed_archive_kind(plan.archive_kind),
+            &plan.temp_archive_path,
+            zed::DownloadedFileType::Uncompressed,
         )
         .map_err(|error| {
             fs::remove_dir_all(&plan.temp_dir).ok();
             friendly_download_error(&plan.asset_name, error)
         })?;
 
+        verify_sha256_file(&plan.temp_archive_path, plan.sha256).map_err(|mismatch| {
+            fs::remove_dir_all(&plan.temp_dir).ok();
+            friendly_checksum_error(&plan.asset_name, mismatch)
+        })?;
+
+        extract_archive(plan.archive_kind, &plan.temp_archive_path, &plan.temp_dir).map_err(
+            |error| {
+                fs::remove_dir_all(&plan.temp_dir).ok();
+                friendly_extraction_error(&plan.asset_name, error)
+            },
+        )?;
+
+        fs::remove_file(&plan.temp_archive_path).map_err(|error| {
+            fs::remove_dir_all(&plan.temp_dir).ok();
+            format!(
+                "failed to remove verified archive `{}` before finalizing download: {error}",
+                plan.temp_archive_path
+            )
+        })?;
+
         if !fs::metadata(&plan.temp_binary_path).is_ok_and(|metadata| metadata.is_file()) {
             fs::remove_dir_all(&plan.temp_dir).ok();
             return Err(format!(
-                "downloaded `{}` but did not find expected binary `{}`; install manually with `{}`",
+                "downloaded and verified `{}` but did not find expected binary `{}`.\n\nInstall the pinned server with:\n{}\n\nOr configure lsp.{LANGUAGE_SERVER_ID}.binary.path to a compatible local binary.",
                 plan.asset_name,
                 plan.temp_binary_path,
                 manual_install_hint()
@@ -435,6 +471,54 @@ mod tests {
 
         assert!(message.contains("pinned release asset was not found"));
         assert!(message.contains("vibe-xpls_v0.0.2_linux_amd64.tar.gz"));
+    }
+
+    #[test]
+    fn checksum_error_says_what_failed_without_raw_host_json() {
+        let message = friendly_checksum_error(
+            "vibe-xpls_v0.0.2_darwin_arm64.tar.gz",
+            ChecksumMismatch {
+                expected: "expected-sha".to_string(),
+                actual: "actual-sha".to_string(),
+            },
+        );
+
+        assert!(message.contains("Could not verify vibe-xpls v0.0.2 for crossplane-yaml."));
+        assert!(message.contains("SHA-256 checksum did not match"));
+        assert!(message.contains("Expected `expected-sha`, got `actual-sha`"));
+        assert!(message.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2"));
+        assert!(!message.contains("response:"));
+    }
+
+    #[test]
+    fn extraction_error_sanitizes_host_json() {
+        let message = friendly_extraction_error(
+            "vibe-xpls_v0.0.2_linux_amd64.tar.gz",
+            "status error 500, response: \"{\\\"message\\\":\\\"internal error\\\"}\"",
+        );
+
+        assert!(message.contains("Could not extract vibe-xpls v0.0.2 for crossplane-yaml."));
+        assert!(message.contains("status error 500"));
+        assert!(message.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2"));
+        assert!(!message.contains("{\\\"message\\\""));
+    }
+
+    #[test]
+    fn managed_download_uses_verified_raw_archive_path() {
+        let source = include_str!("lib.rs");
+        let raw_download_block = concat!(
+            "zed::download_file(\n",
+            "            &plan.download_url,\n",
+            "            &plan.temp_archive_path,\n",
+            "            zed::DownloadedFileType::Uncompressed,\n",
+            "        )"
+        );
+
+        assert!(source.contains(raw_download_block));
+        assert!(source.contains("verify_sha256_file(&plan.temp_archive_path, plan.sha256)"));
+        assert!(!source.contains(concat!("fn zed_archive", "_kind")));
+        assert!(!source.contains(concat!("DownloadedFileType::", "GzipTar")));
+        assert!(!source.contains(concat!("DownloadedFileType::", "Zip")));
     }
 
     #[test]
