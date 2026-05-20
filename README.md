@@ -113,6 +113,14 @@ you can add directory-scoped patterns:
 
 Reopen matching files after changing the setting.
 
+If you want Zed extensions to be able to automatically select `Crossplane YAML`
+for Crossplane files without manual `file_types` settings, add a thumbs-up
+reaction to this Zed discussion:
+
+https://github.com/zed-industries/zed/discussions/56434
+
+Please avoid comment-only "+1" messages.
+
 The extension keeps Zed's normal YAML support enabled for ordinary YAML files.
 
 ## Template Highlighting
