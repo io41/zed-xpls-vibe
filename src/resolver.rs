@@ -31,7 +31,9 @@ pub struct DownloadPlan {
     pub temp_dir: String,
     pub binary_path: String,
     pub temp_binary_path: String,
+    pub temp_archive_path: String,
     pub archive_kind: ArchiveKind,
+    pub sha256: &'static str,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -394,7 +396,75 @@ mod tests {
         assert_eq!(plan.temp_dir, "vibe-xpls-v0.0.2.tmp");
         assert_eq!(plan.binary_path, "vibe-xpls-v0.0.2/vibe-xpls");
         assert_eq!(plan.temp_binary_path, "vibe-xpls-v0.0.2.tmp/vibe-xpls");
+        assert_eq!(
+            plan.temp_archive_path,
+            "vibe-xpls-v0.0.2.tmp/vibe-xpls_v0.0.2_darwin_arm64.tar.gz"
+        );
         assert_eq!(plan.archive_kind, ArchiveKind::GzipTar);
+        assert_eq!(
+            plan.sha256,
+            "d98a35fd57334b0c6d070d283b5ff9c12e46beca0a453c44230f621a0cf56454"
+        );
+    }
+
+    #[test]
+    fn all_supported_assets_have_valid_sha256_digests() {
+        let expected = [
+            (
+                HostOs::Mac,
+                HostArch::X8664,
+                "vibe-xpls_v0.0.2_darwin_amd64.tar.gz",
+                "a034a9b2eab33ae30eb16909a65c2e885414104649a854a65b62940befba71de",
+            ),
+            (
+                HostOs::Mac,
+                HostArch::Aarch64,
+                "vibe-xpls_v0.0.2_darwin_arm64.tar.gz",
+                "d98a35fd57334b0c6d070d283b5ff9c12e46beca0a453c44230f621a0cf56454",
+            ),
+            (
+                HostOs::Linux,
+                HostArch::X8664,
+                "vibe-xpls_v0.0.2_linux_amd64.tar.gz",
+                "d87f77237b3405a7388110ab65713e764e60338bc49239322272d017ac971d03",
+            ),
+            (
+                HostOs::Linux,
+                HostArch::Aarch64,
+                "vibe-xpls_v0.0.2_linux_arm64.tar.gz",
+                "2b7735f6ec251fd381fa2b3f3e6ed7d1f55d702bde96893c809f1ff8ca37d018",
+            ),
+            (
+                HostOs::Windows,
+                HostArch::X8664,
+                "vibe-xpls_v0.0.2_windows_amd64.zip",
+                "f8bad966fe7970785a541aeffec7f7faf9e400d2256310aeb22220e8af826a94",
+            ),
+            (
+                HostOs::Windows,
+                HostArch::Aarch64,
+                "vibe-xpls_v0.0.2_windows_arm64.zip",
+                "87158951680b0fa942821ec28fa9d6492ca3b6cea81da42451b1ef33c2c3c0e5",
+            ),
+        ];
+
+        for (os, arch, asset_name, sha256) in expected {
+            let plan = download_plan(os, arch).unwrap();
+
+            assert_eq!(plan.asset_name, asset_name, "{os:?} {arch:?}");
+            assert_eq!(plan.sha256, sha256, "{os:?} {arch:?}");
+            assert_eq!(plan.sha256.len(), 64, "{os:?} {arch:?}");
+            assert!(
+                plan.sha256.chars().all(|ch| ch.is_ascii_hexdigit()),
+                "{os:?} {arch:?}: {}",
+                plan.sha256
+            );
+            assert!(
+                plan.temp_archive_path.ends_with(&plan.asset_name),
+                "{os:?} {arch:?}: {}",
+                plan.temp_archive_path
+            );
+        }
     }
 
     #[test]
@@ -574,6 +644,33 @@ pub fn release_asset_url(asset_name: &str) -> String {
     format!(
         "https://github.com/{VIBE_XPLS_REPO}/releases/download/{VIBE_XPLS_VERSION}/{asset_name}"
     )
+}
+
+fn release_asset_sha256(os: HostOs, arch: HostArch) -> Result<&'static str, String> {
+    match (os, arch) {
+        (HostOs::Mac, HostArch::X8664) => {
+            Ok("a034a9b2eab33ae30eb16909a65c2e885414104649a854a65b62940befba71de")
+        }
+        (HostOs::Mac, HostArch::Aarch64) => {
+            Ok("d98a35fd57334b0c6d070d283b5ff9c12e46beca0a453c44230f621a0cf56454")
+        }
+        (HostOs::Linux, HostArch::X8664) => {
+            Ok("d87f77237b3405a7388110ab65713e764e60338bc49239322272d017ac971d03")
+        }
+        (HostOs::Linux, HostArch::Aarch64) => {
+            Ok("2b7735f6ec251fd381fa2b3f3e6ed7d1f55d702bde96893c809f1ff8ca37d018")
+        }
+        (HostOs::Windows, HostArch::X8664) => {
+            Ok("f8bad966fe7970785a541aeffec7f7faf9e400d2256310aeb22220e8af826a94")
+        }
+        (HostOs::Windows, HostArch::Aarch64) => {
+            Ok("87158951680b0fa942821ec28fa9d6492ca3b6cea81da42451b1ef33c2c3c0e5")
+        }
+        (_, HostArch::X86) => Err(format!(
+            "unsupported architecture x86 for vibe-xpls {VIBE_XPLS_VERSION}; install manually with `{}`",
+            manual_install_hint()
+        )),
+    }
 }
 
 pub fn parse_vibe_xpls_version(stdout: &str) -> Result<&str, String> {
@@ -804,8 +901,10 @@ pub fn download_plan(os: HostOs, arch: HostArch) -> Result<DownloadPlan, String>
     let temp_dir = format!("{version_dir}.tmp");
     let binary_path = format!("{version_dir}/{binary_name}");
     let temp_binary_path = format!("{temp_dir}/{binary_name}");
+    let sha256 = release_asset_sha256(os, arch)?;
 
     let asset_name = format!("vibe-xpls_{VIBE_XPLS_VERSION}_{os_part}_{arch_part}.{extension}");
+    let temp_archive_path = format!("{temp_dir}/{asset_name}");
     let download_url = release_asset_url(&asset_name);
 
     Ok(DownloadPlan {
@@ -815,6 +914,8 @@ pub fn download_plan(os: HostOs, arch: HostArch) -> Result<DownloadPlan, String>
         temp_dir,
         binary_path,
         temp_binary_path,
+        temp_archive_path,
         archive_kind,
+        sha256,
     })
 }
