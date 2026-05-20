@@ -68,6 +68,17 @@ The extension must not add a default `gh` fallback or GitHub release API lookup
 for the managed download path. Managed downloads use the direct pinned release
 asset URL.
 
+Managed downloads verify the pinned release archive SHA-256 before extraction.
+Every `VIBE_XPLS_VERSION` bump must update the platform digest table and its
+coverage tests in the same change.
+
+Archive extraction rejects static path traversal, archive links, unsafe
+destination symlinks, and unsupported entry types. It still uses path-based
+`std::fs` operations on `wasm32-wasip2`, so a concurrent local process mutating
+the managed install directory during extraction remains a residual TOCTOU risk.
+That risk is accepted for the current freshly recreated temporary-directory
+install flow.
+
 ## Release And CI
 
 Release Please manages extension releases and changelog updates.
@@ -87,6 +98,4 @@ rather than more syntax-query work. Useful future capabilities include:
 - provider-schema-derived completion for composed resources;
 - diagnostics that understand Crossplane function request data;
 - content-based language selection if Zed adds a hook that can outrank native
-  YAML suffix matching;
-- checksum verification if Zed exposes downloaded archive bytes or release asset
-  digests, or if the extension later owns archive download and extraction.
+  YAML suffix matching.
