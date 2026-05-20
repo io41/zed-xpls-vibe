@@ -1,6 +1,6 @@
 # Crossplane YAML Planning Docs
 
-Status: no active plans or implementation specs.
+Status: active design spec for reviewable `vibe-xpls` bump automation.
 
 This directory keeps only current planning context and concise decision records.
 Completed task-by-task plans and superseded pre-public specs were removed because
@@ -26,7 +26,9 @@ that are no longer useful. Git history remains the archive for those documents.
 
 ## Pending Work
 
-There is no active local implementation plan in this directory.
+- Review
+  `specs/2026-05-21-reviewable-vibe-xpls-bump-workflow-design.md`, then write
+  an implementation plan for the maintenance bump script and workflow.
 
 Release Please PRs may be created by normal docs or source changes. Leave them
 open until there is a reason to publish a new extension release.
