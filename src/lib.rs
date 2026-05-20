@@ -10,9 +10,9 @@ use resolver::{
 use zed::settings::LspSettings;
 use zed_extension_api::{self as zed, Result};
 
-const LANGUAGE_SERVER_ID: &str = "zed-xpls-vibe";
+const LANGUAGE_SERVER_ID: &str = "crossplane-yaml";
 
-struct ZedXplsVibeExtension {
+struct CrossplaneYamlExtension {
     cached_downloaded_binary: Option<String>,
 }
 
@@ -283,7 +283,7 @@ fn friendly_download_error(asset_name: &str, error: impl ToString) -> String {
     )
 }
 
-impl ZedXplsVibeExtension {
+impl CrossplaneYamlExtension {
     fn downloaded_binary_path(
         &mut self,
         language_server_id: &zed::LanguageServerId,
@@ -350,7 +350,7 @@ impl ZedXplsVibeExtension {
     }
 }
 
-impl zed::Extension for ZedXplsVibeExtension {
+impl zed::Extension for CrossplaneYamlExtension {
     fn new() -> Self {
         Self {
             cached_downloaded_binary: None,
@@ -392,7 +392,7 @@ impl zed::Extension for ZedXplsVibeExtension {
     }
 }
 
-zed::register_extension!(ZedXplsVibeExtension);
+zed::register_extension!(CrossplaneYamlExtension);
 
 #[cfg(test)]
 mod tests {
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn uses_unique_language_server_id() {
-        assert_eq!(LANGUAGE_SERVER_ID, "zed-xpls-vibe");
+        assert_eq!(LANGUAGE_SERVER_ID, "crossplane-yaml");
     }
 
     #[test]
@@ -421,7 +421,7 @@ mod tests {
             "status error 403, response: \"{\\\"message\\\":\\\"API rate limit exceeded\\\"}\"",
         );
 
-        assert!(message.contains("Could not download vibe-xpls v0.0.2 for zed-xpls-vibe."));
+        assert!(message.contains("Could not download vibe-xpls v0.0.2 for crossplane-yaml."));
         assert!(message.contains("GitHub refused the download"));
         assert!(message.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2"));
         assert!(!message.contains("{\\\"message\\\""));

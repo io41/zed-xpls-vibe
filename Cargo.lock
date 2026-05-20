@@ -48,6 +48,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossplane-yaml"
+version = "0.0.1"
+dependencies = [
+ "zed_extension_api",
+]
+
+[[package]]
 name = "displaydoc"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -736,13 +743,6 @@ dependencies = [
  "quote",
  "syn",
  "synstructure",
-]
-
-[[package]]
-name = "zed-xpls-vibe"
-version = "0.0.1"
-dependencies = [
- "zed_extension_api",
 ]
 
 [[package]]

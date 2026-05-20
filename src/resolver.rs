@@ -591,7 +591,7 @@ pub fn parse_vibe_xpls_version(stdout: &str) -> Result<&str, String> {
 
 fn local_binary_error(path: &str, message: impl AsRef<str>) -> String {
     format!(
-        "Could not verify vibe-xpls at {path}. {}\n\nInstall the pinned server with:\n{}\n\nOr configure lsp.zed-xpls-vibe.binary.path if you intentionally want to use a different server version.",
+        "Could not verify vibe-xpls at {path}. {}\n\nInstall the pinned server with:\n{}\n\nOr configure lsp.crossplane-yaml.binary.path if you intentionally want to use a different server version.",
         message.as_ref(),
         manual_install_hint()
     )
@@ -599,7 +599,7 @@ fn local_binary_error(path: &str, message: impl AsRef<str>) -> String {
 
 fn version_mismatch_error(path: &str, found: &str) -> String {
     format!(
-        "Found vibe-xpls {found} at {path}, but zed-xpls-vibe requires vibe-xpls {VIBE_XPLS_VERSION}.\n\nInstall the pinned server with:\n{}\n\nOr configure lsp.zed-xpls-vibe.binary.path if you intentionally want to use a different server version.",
+        "Found vibe-xpls {found} at {path}, but crossplane-yaml requires vibe-xpls {VIBE_XPLS_VERSION}.\n\nInstall the pinned server with:\n{}\n\nOr configure lsp.crossplane-yaml.binary.path if you intentionally want to use a different server version.",
         manual_install_hint()
     )
 }
