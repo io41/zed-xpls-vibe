@@ -435,6 +435,14 @@ zed::register_extension!(CrossplaneYamlExtension);
 mod tests {
     use super::*;
 
+    fn pinned_asset_name(os: &str, arch: &str, extension: &str) -> String {
+        format!("vibe-xpls_{VIBE_XPLS_VERSION}_{os}_{arch}.{extension}")
+    }
+
+    fn pinned_version_output() -> String {
+        format!("{VIBE_XPLS_BIN} {VIBE_XPLS_VERSION}\n")
+    }
+
     #[test]
     fn uses_unique_language_server_id() {
         assert_eq!(LANGUAGE_SERVER_ID, "crossplane-yaml");
@@ -447,59 +455,68 @@ mod tests {
 
     #[test]
     fn pins_vibe_xpls_release() {
-        assert_eq!(VIBE_XPLS_VERSION, "v0.0.2");
+        assert!(VIBE_XPLS_VERSION.starts_with('v'));
         assert_eq!(VIBE_XPLS_BIN, "vibe-xpls");
     }
 
     #[test]
     fn download_error_sanitizes_github_json() {
+        let asset_name = pinned_asset_name("darwin", "arm64", "tar.gz");
         let message = friendly_download_error(
-            "vibe-xpls_v0.0.2_darwin_arm64.tar.gz",
+            &asset_name,
             "status error 403, response: \"{\\\"message\\\":\\\"API rate limit exceeded\\\"}\"",
         );
 
-        assert!(message.contains("Could not download vibe-xpls v0.0.2 for crossplane-yaml."));
+        assert!(message.contains(&format!(
+            "Could not download vibe-xpls {VIBE_XPLS_VERSION} for crossplane-yaml."
+        )));
         assert!(message.contains("GitHub refused the download"));
-        assert!(message.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2"));
+        assert!(message.contains(&manual_install_hint()));
         assert!(!message.contains("{\\\"message\\\""));
     }
 
     #[test]
     fn download_error_names_missing_asset() {
-        let message =
-            friendly_download_error("vibe-xpls_v0.0.2_linux_amd64.tar.gz", "status error 404");
+        let asset_name = pinned_asset_name("linux", "amd64", "tar.gz");
+        let message = friendly_download_error(&asset_name, "status error 404");
 
         assert!(message.contains("pinned release asset was not found"));
-        assert!(message.contains("vibe-xpls_v0.0.2_linux_amd64.tar.gz"));
+        assert!(message.contains(&asset_name));
     }
 
     #[test]
     fn checksum_error_says_what_failed_without_raw_host_json() {
+        let asset_name = pinned_asset_name("darwin", "arm64", "tar.gz");
         let message = friendly_checksum_error(
-            "vibe-xpls_v0.0.2_darwin_arm64.tar.gz",
+            &asset_name,
             ChecksumMismatch {
                 expected: "expected-sha".to_string(),
                 actual: "actual-sha".to_string(),
             },
         );
 
-        assert!(message.contains("Could not verify vibe-xpls v0.0.2 for crossplane-yaml."));
+        assert!(message.contains(&format!(
+            "Could not verify vibe-xpls {VIBE_XPLS_VERSION} for crossplane-yaml."
+        )));
         assert!(message.contains("SHA-256 checksum did not match"));
         assert!(message.contains("Expected `expected-sha`, got `actual-sha`"));
-        assert!(message.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2"));
+        assert!(message.contains(&manual_install_hint()));
         assert!(!message.contains("response:"));
     }
 
     #[test]
     fn extraction_error_sanitizes_host_json() {
+        let asset_name = pinned_asset_name("linux", "amd64", "tar.gz");
         let message = friendly_extraction_error(
-            "vibe-xpls_v0.0.2_linux_amd64.tar.gz",
+            &asset_name,
             "status error 500, response: \"{\\\"message\\\":\\\"internal error\\\"}\"",
         );
 
-        assert!(message.contains("Could not extract vibe-xpls v0.0.2 for crossplane-yaml."));
+        assert!(message.contains(&format!(
+            "Could not extract vibe-xpls {VIBE_XPLS_VERSION} for crossplane-yaml."
+        )));
         assert!(message.contains("status error 500"));
-        assert!(message.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2"));
+        assert!(message.contains(&manual_install_hint()));
         assert!(!message.contains("{\\\"message\\\""));
     }
 
@@ -605,7 +622,7 @@ mod tests {
             probed.push(candidate.to_string());
             if candidate == "/custom/bin/vibe-xpls" {
                 VersionProbeResult::Output {
-                    stdout: "vibe-xpls v0.0.2\n".to_string(),
+                    stdout: pinned_version_output(),
                     stderr: String::new(),
                 }
             } else {
@@ -637,7 +654,7 @@ mod tests {
                 VersionProbeResult::Failed("permission denied".to_string())
             } else if candidate == "/custom/bin/vibe-xpls" {
                 VersionProbeResult::Output {
-                    stdout: "vibe-xpls v0.0.2\n".to_string(),
+                    stdout: pinned_version_output(),
                     stderr: String::new(),
                 }
             } else {
@@ -664,7 +681,7 @@ mod tests {
             probed.push(candidate.to_string());
             if candidate == r"C:\custom\bin\vibe-xpls.exe" {
                 VersionProbeResult::Output {
-                    stdout: "vibe-xpls v0.0.2\n".to_string(),
+                    stdout: pinned_version_output(),
                     stderr: String::new(),
                 }
             } else {

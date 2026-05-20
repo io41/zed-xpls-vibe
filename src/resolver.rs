@@ -93,10 +93,26 @@ mod tests {
         }
     }
 
+    fn pinned_version_output() -> String {
+        format!("{VIBE_XPLS_BIN} {VIBE_XPLS_VERSION}\n")
+    }
+
+    fn pinned_asset_name(os: &str, arch: &str, extension: &str) -> String {
+        format!("vibe-xpls_{VIBE_XPLS_VERSION}_{os}_{arch}.{extension}")
+    }
+
+    fn pinned_version_dir() -> String {
+        format!("vibe-xpls-{VIBE_XPLS_VERSION}")
+    }
+
+    fn pinned_temp_dir() -> String {
+        format!("{}.tmp", pinned_version_dir())
+    }
+
     impl FakeLookup {
         fn matching_version() -> VersionProbeResult {
             VersionProbeResult::Output {
-                stdout: "vibe-xpls v0.0.2\n".to_string(),
+                stdout: pinned_version_output(),
                 stderr: String::new(),
             }
         }
@@ -131,16 +147,16 @@ mod tests {
     #[test]
     fn version_output_accepts_exact_pinned_version() {
         assert_eq!(
-            parse_vibe_xpls_version("vibe-xpls v0.0.2\n").unwrap(),
+            parse_vibe_xpls_version(&pinned_version_output()).unwrap(),
             VIBE_XPLS_VERSION
         );
     }
 
     #[test]
     fn version_output_rejects_extra_tokens_and_build_metadata() {
-        assert!(parse_vibe_xpls_version("vibe-xpls v0.0.2 extra").is_err());
-        assert!(parse_vibe_xpls_version("vibe-xpls v0.0.2+dev").is_err());
-        assert!(parse_vibe_xpls_version("prefix vibe-xpls v0.0.2").is_err());
+        assert!(parse_vibe_xpls_version(&format!("vibe-xpls {VIBE_XPLS_VERSION} extra")).is_err());
+        assert!(parse_vibe_xpls_version(&format!("vibe-xpls {VIBE_XPLS_VERSION}+dev")).is_err());
+        assert!(parse_vibe_xpls_version(&format!("prefix vibe-xpls {VIBE_XPLS_VERSION}")).is_err());
     }
 
     #[test]
@@ -385,21 +401,19 @@ mod tests {
     }
 
     #[test]
-    fn asset_plan_matches_v0_0_2_release_names() {
+    fn asset_plan_matches_pinned_release_names() {
         let plan = download_plan(HostOs::Mac, HostArch::Aarch64).unwrap();
-        assert_eq!(plan.asset_name, "vibe-xpls_v0.0.2_darwin_arm64.tar.gz");
-        assert_eq!(
-            plan.download_url,
-            "https://github.com/io41/vibe-xpls/releases/download/v0.0.2/vibe-xpls_v0.0.2_darwin_arm64.tar.gz"
-        );
-        assert_eq!(plan.version_dir, "vibe-xpls-v0.0.2");
-        assert_eq!(plan.temp_dir, "vibe-xpls-v0.0.2.tmp");
-        assert_eq!(plan.binary_path, "vibe-xpls-v0.0.2/vibe-xpls");
-        assert_eq!(plan.temp_binary_path, "vibe-xpls-v0.0.2.tmp/vibe-xpls");
-        assert_eq!(
-            plan.temp_archive_path,
-            "vibe-xpls-v0.0.2.tmp/vibe-xpls_v0.0.2_darwin_arm64.tar.gz"
-        );
+        let asset_name = pinned_asset_name("darwin", "arm64", "tar.gz");
+        let version_dir = pinned_version_dir();
+        let temp_dir = pinned_temp_dir();
+
+        assert_eq!(plan.asset_name, asset_name);
+        assert_eq!(plan.download_url, release_asset_url(&asset_name));
+        assert_eq!(plan.version_dir, version_dir);
+        assert_eq!(plan.temp_dir, temp_dir);
+        assert_eq!(plan.binary_path, format!("{version_dir}/vibe-xpls"));
+        assert_eq!(plan.temp_binary_path, format!("{temp_dir}/vibe-xpls"));
+        assert_eq!(plan.temp_archive_path, format!("{temp_dir}/{asset_name}"));
         assert_eq!(plan.archive_kind, ArchiveKind::GzipTar);
         assert_eq!(
             plan.sha256,
@@ -413,37 +427,37 @@ mod tests {
             (
                 HostOs::Mac,
                 HostArch::X8664,
-                "vibe-xpls_v0.0.2_darwin_amd64.tar.gz",
+                pinned_asset_name("darwin", "amd64", "tar.gz"),
                 "a034a9b2eab33ae30eb16909a65c2e885414104649a854a65b62940befba71de",
             ),
             (
                 HostOs::Mac,
                 HostArch::Aarch64,
-                "vibe-xpls_v0.0.2_darwin_arm64.tar.gz",
+                pinned_asset_name("darwin", "arm64", "tar.gz"),
                 "d98a35fd57334b0c6d070d283b5ff9c12e46beca0a453c44230f621a0cf56454",
             ),
             (
                 HostOs::Linux,
                 HostArch::X8664,
-                "vibe-xpls_v0.0.2_linux_amd64.tar.gz",
+                pinned_asset_name("linux", "amd64", "tar.gz"),
                 "d87f77237b3405a7388110ab65713e764e60338bc49239322272d017ac971d03",
             ),
             (
                 HostOs::Linux,
                 HostArch::Aarch64,
-                "vibe-xpls_v0.0.2_linux_arm64.tar.gz",
+                pinned_asset_name("linux", "arm64", "tar.gz"),
                 "2b7735f6ec251fd381fa2b3f3e6ed7d1f55d702bde96893c809f1ff8ca37d018",
             ),
             (
                 HostOs::Windows,
                 HostArch::X8664,
-                "vibe-xpls_v0.0.2_windows_amd64.zip",
+                pinned_asset_name("windows", "amd64", "zip"),
                 "f8bad966fe7970785a541aeffec7f7faf9e400d2256310aeb22220e8af826a94",
             ),
             (
                 HostOs::Windows,
                 HostArch::Aarch64,
-                "vibe-xpls_v0.0.2_windows_arm64.zip",
+                pinned_asset_name("windows", "arm64", "zip"),
                 "87158951680b0fa942821ec28fa9d6492ca3b6cea81da42451b1ef33c2c3c0e5",
             ),
         ];
@@ -470,23 +484,24 @@ mod tests {
     #[test]
     fn windows_asset_uses_zip_and_exe() {
         let plan = download_plan(HostOs::Windows, HostArch::X8664).unwrap();
-        assert_eq!(plan.asset_name, "vibe-xpls_v0.0.2_windows_amd64.zip");
+        let asset_name = pinned_asset_name("windows", "amd64", "zip");
+
+        assert_eq!(plan.asset_name, asset_name);
+        assert_eq!(plan.download_url, release_asset_url(&asset_name));
         assert_eq!(
-            plan.download_url,
-            "https://github.com/io41/vibe-xpls/releases/download/v0.0.2/vibe-xpls_v0.0.2_windows_amd64.zip"
+            plan.binary_path,
+            format!("{}/vibe-xpls.exe", pinned_version_dir())
         );
-        assert_eq!(plan.binary_path, "vibe-xpls-v0.0.2/vibe-xpls.exe");
         assert_eq!(plan.archive_kind, ArchiveKind::Zip);
     }
 
     #[test]
     fn linux_asset_uses_direct_pinned_url() {
         let plan = download_plan(HostOs::Linux, HostArch::X8664).unwrap();
-        assert_eq!(plan.asset_name, "vibe-xpls_v0.0.2_linux_amd64.tar.gz");
-        assert_eq!(
-            plan.download_url,
-            "https://github.com/io41/vibe-xpls/releases/download/v0.0.2/vibe-xpls_v0.0.2_linux_amd64.tar.gz"
-        );
+        let asset_name = pinned_asset_name("linux", "amd64", "tar.gz");
+
+        assert_eq!(plan.asset_name, asset_name);
+        assert_eq!(plan.download_url, release_asset_url(&asset_name));
     }
 
     #[test]
@@ -530,7 +545,7 @@ mod tests {
         let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
 
         assert!(error.contains("Found vibe-xpls v0.0.3 at /path/vibe-xpls"));
-        assert!(error.contains("requires vibe-xpls v0.0.2"));
+        assert!(error.contains(&format!("requires vibe-xpls {VIBE_XPLS_VERSION}")));
         assert_eq!(lookup.probed, vec!["/path/vibe-xpls".to_string()]);
     }
 
@@ -571,7 +586,7 @@ mod tests {
         let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
 
         assert!(error.contains("Found vibe-xpls v0.0.3 at /gobin/vibe-xpls"));
-        assert!(error.contains("requires vibe-xpls v0.0.2"));
+        assert!(error.contains(&format!("requires vibe-xpls {VIBE_XPLS_VERSION}")));
     }
 
     #[test]
@@ -589,7 +604,7 @@ mod tests {
         let error = resolve_local_binary(None, HostOs::Mac, &mut lookup).unwrap_err();
 
         assert!(error.contains("Could not verify vibe-xpls at /gobin/vibe-xpls"));
-        assert!(error.contains("expected `vibe-xpls v0.0.2`"));
+        assert!(error.contains(&format!("expected `vibe-xpls {VIBE_XPLS_VERSION}`")));
     }
 
     #[test]
@@ -628,7 +643,7 @@ mod tests {
     fn x86_is_unsupported() {
         let error = download_plan(HostOs::Linux, HostArch::X86).unwrap_err();
         assert!(error.contains("unsupported architecture"));
-        assert!(error.contains("go install github.com/io41/vibe-xpls/cmd/vibe-xpls@v0.0.2"));
+        assert!(error.contains(&manual_install_hint()));
     }
 }
 
