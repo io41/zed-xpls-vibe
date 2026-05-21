@@ -1,6 +1,6 @@
 id = "crossplane-yaml"
 name = "Crossplane YAML"
-version = "0.0.2"
+version = "0.0.3"
 schema_version = 1
 authors = ["Tim Kersten"]
 description = "Crossplane package diagnostics and Crossplane YAML highlighting powered by vibe-xpls"
