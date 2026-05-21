@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.0.3](https://github.com/io41/crossplane-yaml/compare/v0.0.2...v0.0.3) (2026-05-21)
+
+
+### Features
+
+* add safe archive verification helpers ([f3a5741](https://github.com/io41/crossplane-yaml/commit/f3a574187aa02199e40fe84038c38a9773c7aa43))
+* pin vibe-xpls archive digests ([143ee31](https://github.com/io41/crossplane-yaml/commit/143ee318a64b85c1466992eef38dc3f0dd9ad738))
+* verify downloaded vibe-xpls archives ([c4427a7](https://github.com/io41/crossplane-yaml/commit/c4427a7542835170109be858c7a1d13c0c0dbfe5))
+* **vibe-xpls:** bump pinned server to v0.0.3 ([94d1c81](https://github.com/io41/crossplane-yaml/commit/94d1c817c0b2e47e614fdce826d3390fb5d633c0))
+
+
+### Bug Fixes
+
+* narrow generated yaml injections ([40272cc](https://github.com/io41/crossplane-yaml/commit/40272ccef7a5f87cb7e3c39842411754d5fab525))
+
+
+### Documentation
+
+* clarify dev extension setup ([026933e](https://github.com/io41/crossplane-yaml/commit/026933e98e391c53b18ed858b3ad539eea205e21))
+* clarify marketplace status ([96c8758](https://github.com/io41/crossplane-yaml/commit/96c87583fa18448aab8f71293c6414cb50d6c9a3))
+* clear vibe-xpls bump plan ([929bc49](https://github.com/io41/crossplane-yaml/commit/929bc495a013aec2a82c5dac079ceb3f098c02fd))
+* consolidate planning docs ([021b2a2](https://github.com/io41/crossplane-yaml/commit/021b2a2be77ced408f4f370b397fb6133029e86f))
+* link zed file type discussion ([61d08de](https://github.com/io41/crossplane-yaml/commit/61d08de1d66b4ccbb8c073e8f807dc53f9a452b4))
+* plan vibe-xpls bump workflow ([bed3f48](https://github.com/io41/crossplane-yaml/commit/bed3f48e4f10b54bc83daf4c34cf8840a979d817))
+* plan vibe-xpls checksum verification ([54712bc](https://github.com/io41/crossplane-yaml/commit/54712bcab8038ab7e722eba608f91e213db37d6c))
+* record archive verification decision ([62c7b3e](https://github.com/io41/crossplane-yaml/commit/62c7b3e331ca5cc80c1ab16d66d7095506a8a55d))
+* simplify end-user readme ([a48b454](https://github.com/io41/crossplane-yaml/commit/a48b454934f9d471ade87682951d20444c9b8520))
+* soften rustup setup guidance ([e7ba2c8](https://github.com/io41/crossplane-yaml/commit/e7ba2c8fa73c99c3de81e157e2e1ff2fcb2077da))
+* specify vibe-xpls bump workflow ([5718ade](https://github.com/io41/crossplane-yaml/commit/5718ade452b96e989178ad4edf864383b546de2c))
+* specify vibe-xpls checksum verification ([6d7500f](https://github.com/io41/crossplane-yaml/commit/6d7500fa95ef0075cbfe5027870196d61dd46a89))
+
+
+### Tests
+
+* avoid duplicated vibe-xpls digest pins ([0d7e4a1](https://github.com/io41/crossplane-yaml/commit/0d7e4a15faff31314ad1540ebaf85dd55941a45f))
+* derive vibe-xpls version expectations ([463afac](https://github.com/io41/crossplane-yaml/commit/463afac3dbc2da815a9aa861f09fab90d511faed))
+
+
+### Continuous Integration
+
+* add vibe-xpls bump script ([34d997b](https://github.com/io41/crossplane-yaml/commit/34d997be37c28fef24502c0d2ad240aa319fa79e))
+* add vibe-xpls bump workflow ([73ce78b](https://github.com/io41/crossplane-yaml/commit/73ce78bbfceb48132f49ac6c2cd8e3bc8b5d73ad))
+* fix vibe-xpls bump workflow env ([e0b22b7](https://github.com/io41/crossplane-yaml/commit/e0b22b70e93eee48d1e38ad5437937aa5dd68baf))
+
 ## [0.0.2](https://github.com/io41/crossplane-yaml/compare/v0.0.1...v0.0.2) (2026-05-20)
 
 
